@@ -37,11 +37,9 @@ class Node:
         if idx == self.data_no:
             self.inefficient_tranmission +=1
         else:
-            print("Pushing data to node")
             node.receive_data(idx)
             self.efficient_tranmission += 1
         
-
     def pull_data(self, node ):
         return node.push_data(self)
 
@@ -63,8 +61,6 @@ class Node:
 
     def set_position(self ,position):
         self.position = position
-
-
 
 class NodeAnalyzer :
 
@@ -154,31 +150,72 @@ class NodeAnalyzer :
     def emptyNodes(self):
         return [ n for n in self.nodes if not any(n.data)]
 
+    def animate(self):
+        def update_line(num, na , complete , incomplete , empty):
+            na.update()
+            newcomplete = na.completeNodes()
+            newincomplete = na.incompleteNodes()
+            newempty = na.emptyNodes()
+            complete.set_data([ n.position[0] for n in newcomplete] , [ n.position[1] for n in newcomplete])
+            incomplete.set_data([ n.position[0] for n in newincomplete] , [ n.position[1] for n in newincomplete])
+            empty.set_data([ n.position[0] for n in newempty] , [ n.position[1] for n in newempty])
+            return complete,incomplete ,empty,
+
+        fig1 = plt.figure()
+        complete, = plt.plot([], [], 'go' , label = "Complete Points")
+        incomplete, = plt.plot([], [] , 'yo' , label = "Intermediate Points")
+        empty, = plt.plot([], [] , 'ro' , label = "Empty Points")
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.title('Delay Tolerant Network')
+        line_ani = animation.FuncAnimation(fig1, update_line, 25, fargs=(self , complete , incomplete, empty),
+                                           interval=250)
+        plt.legend()
+        plt.show()
+
+
+
+if __name__ == "__main__":
+    node_number = 100
+    na = NodeAnalyzer(node_number , .05 )
+
+    iteration = 0
+    efficiencies = []
+    seed_eff = [0 for i in range( 0 , node_number+1)]
+    seed_ineff = [0 for i in range( 0 , node_number+1)]
+    while not all( [n.complete for n in na.nodes]):
+        for n in na.nodes:
+            n.efficient_tranmission =0
+            n.inefficient_tranmission = 0
+        na.update()
+        efficiency =0
+        inefficiency =0
+        for n in na.nodes:
+            efficiency +=  n.efficient_tranmission
+            inefficiency += n.inefficient_tranmission
+        efficiencies.append(efficiency / float( inefficiency + efficiency ))
+        ncomp =  len( na.completeNodes())
+        seed_eff[ncomp] += efficiency
+        seed_ineff[ncomp] += inefficiency
+        iteration += 1
+
+    fig1 = plt.figure()
+    plt.plot( range(0 , iteration) , efficiencies ,  'b-' )
+    plt.title('Efficiency vs Time')
+    plt.show()
+
+    for i in range( 0 , node_number+1):
+        denom = seed_eff[i] + seed_ineff[i]
+        if denom ==0 :
+            denom = 1
+        num = seed_eff[i]
+        seed_eff[i] = num / float(denom)
+
+    fig1 = plt.figure()
+    plt.plot( [ i for i in range( 0 , node_number + 1) if seed_eff[i] != 0], [ seed_eff[i] for i in range( 0 , node_number + 1) if seed_eff[i] != 0] ,  'go' )
+    plt.title('Efficiency vs number of seeds')
+    plt.show()
+
+
         
 
-na = NodeAnalyzer(200 , .01 )
-
-
-def update_line(num, na , complete , incomplete , empty):
-    na.update()
-    newcomplete = na.completeNodes()
-    newincomplete = na.incompleteNodes()
-    newempty = na.emptyNodes()
-    complete.set_data([ n.position[0] for n in newcomplete] , [ n.position[1] for n in newcomplete])
-    incomplete.set_data([ n.position[0] for n in newincomplete] , [ n.position[1] for n in newincomplete])
-    empty.set_data([ n.position[0] for n in newempty] , [ n.position[1] for n in newempty])
-    return complete,incomplete ,empty,
-
-fig1 = plt.figure()
-complete, = plt.plot([], [], 'go' , label = "Complete Points")
-incomplete, = plt.plot([], [] , 'yo' , label = "Intermediate Points")
-empty, = plt.plot([], [] , 'ro' , label = "Empty Points")
-#lines = plt.plot([] , [] , 'y--' , label = "New Connections")
-
-plt.xlim(0, 1)
-plt.ylim(0, 1)
-plt.title('Delay Tolerant Network')
-line_ani = animation.FuncAnimation(fig1, update_line, 25, fargs=(na , complete , incomplete, empty),
-                                   interval=250)
-plt.legend()
-plt.show()
