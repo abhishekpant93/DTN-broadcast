@@ -6,8 +6,6 @@ import random
 
 class Node:
 
-
-
     def __init__ ( self, position , data = None):
         self.position = position
         self.data = data
@@ -51,13 +49,13 @@ class Node:
 
 
 class NodeAnalyzer :
-    
 
     def __init__(self,  number , connection_dist , data = 1 , initial_data_holders=5):
         self.number = number
         self.connection_dist = connection_dist
         self.nodes = []
         self.data = data
+        self.current_connections = []
         for i in range(  0 , self.number):
             self.nodes.append( Node( np.random.random(2)))
         if initial_data_holders== 0 :
@@ -70,14 +68,25 @@ class NodeAnalyzer :
             if not n.complete:
                 n.receive_data(data)
                 count = count +1
-                
-
+    
     def rehash( self):
+
         for node in self.nodes:
-            node.set_position(np.random.random(2))
-        
+            while True:
+                angle = random.uniform( 0 , 2*math.pi)
+                length = random.paretovariate(1.5) / 50
+                
+                node.position[0] +=  math.cos(angle) *length
+                node.position[1] += math.sin(angle) *length
+                if  (  0 < node.position[0] < 1 and 0 < node.position[1] < 1):
+                    break
+                else:
+                    node.position[0] -=  math.cos(angle) *length
+                    node.position[1] -= math.sin(angle) *length
+                
         self.tree = spatial.KDTree([ n.position for n in self.nodes])
         self.closest_pairs = self.tree.query_pairs(self.connection_dist)
+
 
 
     def update(self):
@@ -108,15 +117,24 @@ class NodeAnalyzer :
 
     def incompleteNodes(self):
         return [ n for n in self.nodes if not n.complete]
-
-
             
 
 na = NodeAnalyzer(200 , .01 )
 
 
-def update_line(num, na , complete , incomplete ):
+def update_line(num, na , complete , incomplete):
     na.update()
+    # for i in range (0 ,len(lines)):
+    #     lines.pop(0).remove()
+    # print lines
+    # connection_seg = []
+    # for conn in na.current_connections:
+    #     connection_seg.append([ na.nodes[conn[0]].position[0] ,  na.nodes[conn[1]].position[0]  ])
+    #     connection_seg.append( [ na.nodes[conn[0]].position[1] ,  na.nodes[conn[1]].position[1] ])
+    
+
+    # lines = plt.plot( *connection_seg ,  color='yellow', linestyle='dashed')
+
     newcomplete = na.completeNodes()
     newincomplete = na.incompleteNodes()
     complete.set_data([ n.position[0] for n in newcomplete] , [ n.position[1] for n in newcomplete])
@@ -124,13 +142,14 @@ def update_line(num, na , complete , incomplete ):
     return complete,incomplete ,
 
 fig1 = plt.figure()
-complete, = plt.plot([], [], 'go')
-incomplete, = plt.plot([], [] , 'ro')
+complete, = plt.plot([], [], 'go' , label = "Points with data")
+incomplete, = plt.plot([], [] , 'ro' , label = "Points without data")
+#lines = plt.plot([] , [] , 'y--' , label = "New Connections")
+
 plt.xlim(0, 1)
 plt.ylim(0, 1)
-plt.xlabel('x')
-plt.title('test')
+plt.title('Delay Tolerant Network')
 line_ani = animation.FuncAnimation(fig1, update_line, 25, fargs=(na , complete , incomplete),
-                                   interval=1000)
-
+                                   interval=250)
+plt.legend()
 plt.show()
