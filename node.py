@@ -7,7 +7,7 @@ import math
 
 class Node:
 
-    def __init__ ( self, position ,idx, data_no):
+    def __init__ ( self, position ,idx, data_no , mode = "PUSH"):
         self.position = position
         self.data_no = data_no
         self.data = [False for i in range(0 , data_no)]
@@ -15,6 +15,7 @@ class Node:
         self.efficient_tranmission = 0
         self.complete = False
         self.idx = idx
+        self.mode = mode
     def __str__(self):
         return "Index: %d , Complete: %s , Data: %s" % (self.idx, self.complete , self.data)
     
@@ -30,9 +31,14 @@ class Node:
                     self.complete = True
 
     def handle_neighbour(self , node):
-        return self.push_data(node)
+        if self.mode == "PUSH":
+            if self.complete:
+                return self.push_data(node)
+        elif self.mode == "PULL":
+            return self.pull_data(node)
         
     def push_data(self, node):
+
         idx = node.first_incomplete_idx()
         if idx == self.data_no:
             self.inefficient_tranmission +=1
@@ -41,7 +47,11 @@ class Node:
             self.efficient_tranmission += 1
         
     def pull_data(self, node ):
-        return node.push_data(self)
+        if not self.complete:
+            if node.complete:
+                return node.push_data(self)
+            else:
+                self.inefficient_tranmission+=1
 
     def receive_data(self , idx):
         "Receive data for packet index i"
@@ -64,14 +74,15 @@ class Node:
 
 class NodeAnalyzer :
 
-    def __init__(self,  number , connection_dist , data_no = 5 , initial_data_holders=5):
+    def __init__(self,  number , connection_dist , mode ="PUSH" , data_no = 5 , initial_data_holders=1 ):
         self.number = number
         self.connection_dist = connection_dist
         self.nodes = []
         self.data_no = data_no
         self.current_connections = []
+        self.mode = mode
         for i in range(  0 , self.number):
-            self.nodes.append( Node( np.random.random(2)  , i , data_no))
+            self.nodes.append( Node( np.random.random(2)  , i , data_no , mode))
             
         if initial_data_holders== 0 :
             self.initial_data_holders = 1
@@ -177,8 +188,9 @@ class NodeAnalyzer :
 
 if __name__ == "__main__":
     node_number = 100
-    na = NodeAnalyzer(node_number , .05 )
-
+    na = NodeAnalyzer(node_number , .05 , "PULL")
+    #naa = NodeAnalyzer(node_number , .05 , "PUSH")
+    #naa.animate()
     iteration = 0
     efficiencies = []
     seed_eff = [0 for i in range( 0 , node_number+1)]
@@ -193,7 +205,14 @@ if __name__ == "__main__":
         for n in na.nodes:
             efficiency +=  n.efficient_tranmission
             inefficiency += n.inefficient_tranmission
-        efficiencies.append(efficiency / float( inefficiency + efficiency ))
+        denom = inefficiency + efficiency
+        if inefficiency + efficiency == 0:
+            if len(efficiencies) == 0:
+                efficiencies.append(1)
+            else:
+                efficiencies.append( efficiencies[-1])
+        else :
+            efficiencies.append(efficiency / float( denom ))
         ncomp =  len( na.completeNodes())
         seed_eff[ncomp] += efficiency
         seed_ineff[ncomp] += inefficiency
