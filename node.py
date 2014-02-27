@@ -3,17 +3,21 @@ import scipy.spatial as spatial
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
+import math
 
 class Node:
 
-    def __init__ ( self, position , data = None):
+    def __init__ ( self, position ,idx, data_no):
         self.position = position
-        self.data = data
-        if data:
-            self.complete =True
-        else:
-            self.complete = False
-            
+        self.data_no = data_no
+        self.data = [False for i in range(0 , data_no)]
+        self.inefficient_tranmission = 0
+        self.efficient_tranmission = 0
+        self.complete = False
+        self.idx = idx
+    def __str__(self):
+        return "Index: %d , Complete: %s , Data: %s" % (self.idx, self.complete , self.data)
+    
     def update(self):
         nearest = getNeighbours(self)
         for n in nearest:
@@ -29,35 +33,50 @@ class Node:
         return self.push_data(node)
         
     def push_data(self, node):
-        return node.receive_data( self.data)
+        idx = node.first_incomplete_idx()
+        if idx == self.data_no:
+            self.inefficient_tranmission +=1
+        else:
+            print("Pushing data to node")
+            node.receive_data(idx)
+            self.efficient_tranmission += 1
+        
 
     def pull_data(self, node ):
         return node.push_data(self)
 
-    def receive_data(self , data):
-        if not self.complete :
-            self.data = data
-            self.complete = True
-            return True
-        else:
+    def receive_data(self , idx):
+        "Receive data for packet index i"
+        if self.data[idx]:
+            print "Problemo"
             return False
+        else:
+            self.data[idx] = True
+            self.complete = all(self.data)
+            return True
+
+    def first_incomplete_idx(self):
+        for i in range(0 , self.data_no):
+            if not self.data[i]:
+                return i
+        return self.data_no
 
     def set_position(self ,position):
         self.position = position
-        
-    
+
 
 
 class NodeAnalyzer :
 
-    def __init__(self,  number , connection_dist , data = 1 , initial_data_holders=5):
+    def __init__(self,  number , connection_dist , data_no = 5 , initial_data_holders=5):
         self.number = number
         self.connection_dist = connection_dist
         self.nodes = []
-        self.data = data
+        self.data_no = data_no
         self.current_connections = []
         for i in range(  0 , self.number):
-            self.nodes.append( Node( np.random.random(2)))
+            self.nodes.append( Node( np.random.random(2)  , i , data_no))
+            
         if initial_data_holders== 0 :
             self.initial_data_holders = 1
         else:
@@ -66,7 +85,10 @@ class NodeAnalyzer :
         while count != self.initial_data_holders:
             n = self.nodes[random.randrange(0 ,number)]
             if not n.complete:
-                n.receive_data(data)
+                for i in range( 0 , data_no):
+                    n.receive_data(i)
+
+                assert( n.complete)
                 count = count +1
     
     def rehash( self):
@@ -94,9 +116,19 @@ class NodeAnalyzer :
         self.current_connections = []
         for i ,node in enumerate(self.nodes):
             neighbour_idxs = self.getNeighbours(i)
-            for neighbour_idx in neighbour_idxs:
+            if len(neighbour_idxs) != 0:
+                neighbour_idx= random.choice( neighbour_idxs)
+                # print "BEFORE ITERATION"
+                # print "Sender: " , node
+                # print "Receiver: ", na.nodes[neighbour_idx]
+            #for neighbour_idx in neighbour_idxs:
+            
                 if node.handle_neighbour(self.nodes[neighbour_idx]):
                     self.current_connections.append( (i , neighbour_idx))
+                # print "AFTER ITERATION"
+                # print "Sender: " , node
+                # print "Receiver: ", na.nodes[neighbour_idx]
+
         print "%d more nodes got packets in this iteration" % len(self.current_connections)
         print "%d complete nodes" % len(self.completeNodes())
         print "%d incomplete nodes" % len(self.incompleteNodes())
@@ -115,41 +147,38 @@ class NodeAnalyzer :
     def completeNodes(self):
         return [ n for n in self.nodes if n.complete]
 
+    
     def incompleteNodes(self):
-        return [ n for n in self.nodes if not n.complete]
-            
+        return [ n for n in self.nodes if any(n.data) and not all(n.data)]
+
+    def emptyNodes(self):
+        return [ n for n in self.nodes if not any(n.data)]
+
+        
 
 na = NodeAnalyzer(200 , .01 )
 
 
-def update_line(num, na , complete , incomplete):
+def update_line(num, na , complete , incomplete , empty):
     na.update()
-    # for i in range (0 ,len(lines)):
-    #     lines.pop(0).remove()
-    # print lines
-    # connection_seg = []
-    # for conn in na.current_connections:
-    #     connection_seg.append([ na.nodes[conn[0]].position[0] ,  na.nodes[conn[1]].position[0]  ])
-    #     connection_seg.append( [ na.nodes[conn[0]].position[1] ,  na.nodes[conn[1]].position[1] ])
-    
-
-    # lines = plt.plot( *connection_seg ,  color='yellow', linestyle='dashed')
-
     newcomplete = na.completeNodes()
     newincomplete = na.incompleteNodes()
+    newempty = na.emptyNodes()
     complete.set_data([ n.position[0] for n in newcomplete] , [ n.position[1] for n in newcomplete])
     incomplete.set_data([ n.position[0] for n in newincomplete] , [ n.position[1] for n in newincomplete])
-    return complete,incomplete ,
+    empty.set_data([ n.position[0] for n in newempty] , [ n.position[1] for n in newempty])
+    return complete,incomplete ,empty,
 
 fig1 = plt.figure()
-complete, = plt.plot([], [], 'go' , label = "Points with data")
-incomplete, = plt.plot([], [] , 'ro' , label = "Points without data")
+complete, = plt.plot([], [], 'go' , label = "Complete Points")
+incomplete, = plt.plot([], [] , 'yo' , label = "Intermediate Points")
+empty, = plt.plot([], [] , 'ro' , label = "Empty Points")
 #lines = plt.plot([] , [] , 'y--' , label = "New Connections")
 
 plt.xlim(0, 1)
 plt.ylim(0, 1)
 plt.title('Delay Tolerant Network')
-line_ani = animation.FuncAnimation(fig1, update_line, 25, fargs=(na , complete , incomplete),
+line_ani = animation.FuncAnimation(fig1, update_line, 25, fargs=(na , complete , incomplete, empty),
                                    interval=250)
 plt.legend()
 plt.show()
