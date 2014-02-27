@@ -7,7 +7,7 @@ import math
 
 class Node:
 
-    def __init__ ( self, position ,idx, data_no , mode = "PUSH"):
+    def __init__ ( self, position ,idx, data_no ):
         self.position = position
         self.data_no = data_no
         self.data = [False for i in range(0 , data_no)]
@@ -15,7 +15,6 @@ class Node:
         self.efficient_tranmission = 0
         self.complete = False
         self.idx = idx
-        self.mode = mode
     def __str__(self):
         return "Index: %d , Complete: %s , Data: %s" % (self.idx, self.complete , self.data)
     
@@ -30,11 +29,11 @@ class Node:
                     self.data = data
                     self.complete = True
 
-    def handle_neighbour(self , node):
-        if self.mode == "PUSH":
+    def handle_neighbour(self , node , mode):
+        if mode == "PUSH":
             if self.complete:
                 return self.push_data(node)
-        elif self.mode == "PULL":
+        elif mode == "PULL":
             return self.pull_data(node)
         
     def push_data(self, node):
@@ -82,7 +81,7 @@ class NodeAnalyzer :
         self.current_connections = []
         self.mode = mode
         for i in range(  0 , self.number):
-            self.nodes.append( Node( np.random.random(2)  , i , data_no , mode))
+            self.nodes.append( Node( np.random.random(2)  , i , data_no))
             
         if initial_data_holders== 0 :
             self.initial_data_holders = 1
@@ -121,6 +120,8 @@ class NodeAnalyzer :
     def update(self):
         self.rehash()
         self.current_connections = []
+        if  float(len(self.completeNodes())) / len(self.nodes)  > .5:
+            self.mode = "PULL"
         for i ,node in enumerate(self.nodes):
             neighbour_idxs = self.getNeighbours(i)
             if len(neighbour_idxs) != 0:
@@ -130,7 +131,7 @@ class NodeAnalyzer :
                 # print "Receiver: ", na.nodes[neighbour_idx]
             #for neighbour_idx in neighbour_idxs:
             
-                if node.handle_neighbour(self.nodes[neighbour_idx]):
+                if node.handle_neighbour(self.nodes[neighbour_idx] , self.mode):
                     self.current_connections.append( (i , neighbour_idx))
                 # print "AFTER ITERATION"
                 # print "Sender: " , node
@@ -188,9 +189,8 @@ class NodeAnalyzer :
 
 if __name__ == "__main__":
     node_number = 100
-    na = NodeAnalyzer(node_number , .05 , "PULL")
-    #naa = NodeAnalyzer(node_number , .05 , "PUSH")
-    #naa.animate()
+    na = NodeAnalyzer(node_number , .05 , "PUSH")
+
     iteration = 0
     efficiencies = []
     seed_eff = [0 for i in range( 0 , node_number+1)]
