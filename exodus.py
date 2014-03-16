@@ -11,10 +11,10 @@ from datetime import datetime
 
 # SIMULATION PARAMETERS
 NUM_NODES = 100
-NUM_COMMUNITES = 1
-P_INTRA_COMMUNITY = 0.75
-P_INTER_COMMUNITY = 0.2
-P_DTN = 0.5
+NUM_COMMUNITES = 2
+P_INTRA_COMMUNITY = 0.74
+P_INTER_COMMUNITY = 0.45
+P_DTN = 0.01
 
 NUM_PACKETS = 1
 
@@ -22,7 +22,7 @@ B_THRESH = 1.0 / NUM_NODES
 B_INIT = 1.0 / NUM_NODES
 B_RESERVED = 1.0 / NUM_NODES ** 2
 
-T = 200
+T = 1000
 
 class Encounters:
     
@@ -240,6 +240,7 @@ class Simulation:
             print 'num switched off :', num_switched_off
             print 'num seeds :', num_seeds
             print 'E_dtn :', self.E_dtn
+            print 'num edges in dtn', len(self.E_dtn)
             for edge in self.E_dtn:
                 self.nodes[edge[0]], self.nodes[edge[1]] = Connection.connect(self.nodes[edge[0]], self.nodes[edge[1]])
             for node in self.nodes:
@@ -265,16 +266,17 @@ class Simulation:
                 if idx1 < idx2:
                     E.append([idx1, idx2])
             
-        # inter community edges
-        residual_nodes = self.num_nodes % self.num_communities
-        expected_edges = int(self.p_inter_community *  nodes_per_community * nodes_per_community )
-        for i in xrange(0,self.num_communities):
-            for j in xrange(0,i):
-                for k in xrange(0,expected_edges):
-                    idx1 = random.randint(0,nodes_per_community-1) + i * nodes_per_community
-                    idx2 = random.randint(0,nodes_per_community-1) + j * nodes_per_community
-                    E.append([idx1, idx2])
-                    #print 'appending inter edge', idx1, idx2
+
+        if self.num_communities > 1:
+            # inter community edges
+            residual_nodes = self.num_nodes % self.num_communities
+            expected_edges = int(self.p_inter_community *  nodes_per_community * nodes_per_community )
+            for i in xrange(0,self.num_communities):
+                for j in xrange(0,i):
+                    for k in xrange(0,expected_edges):
+                        idx1 = random.randint(0,nodes_per_community-1) + i * nodes_per_community
+                        idx2 = random.randint(0,nodes_per_community-1) + j * nodes_per_community
+                        E.append([idx1, idx2])
                     
         #print 'edges (possible duplicate) :', E
         return E
