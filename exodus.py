@@ -1,12 +1,6 @@
-import numpy as np
-import scipy.spatial as spatial
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import random
-import math
 import copy
 import time
-import networkx as nx
 from datetime import datetime
 
 # SIMULATION PARAMETERS
