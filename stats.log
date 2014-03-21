@@ -1,0 +1,49 @@
+1. N = 100, T = 500
+##### STATISTICS #####
+PUSH :
+Broadcast complete time : 500
+Efficient Transmissions : 99
+Inefficient Transmissions : 9179
+Success Transmission % : 1.06704031041
+Coverage :  100.0
+----------------------------------------
+PULL :
+Broadcast complete time : 500
+Efficient Transmissions : 99
+Inefficient Transmissions : 9179
+Success Transmission % : 1.06704031041
+Coverage :  100.0
+----------------------------------------
+EXODUS :
+Broadcast complete time : 80
+Efficient Transmissions : 96
+Inefficient Transmissions : 384
+Success Transmission % : 20.0
+Coverage :  97.0
+----------------------------------------
+
+
+2. N = 100, T = 250
+##### STATISTICS #####
+PUSH :
+Broadcast complete time : 250
+Efficient Transmissions : 99
+Inefficient Transmissions : 4443
+Success Transmission % : 2.17965653897
+Coverage :  100.0
+----------------------------------------
+PULL :
+Broadcast complete time : 250
+Efficient Transmissions : 99
+Inefficient Transmissions : 4443
+Success Transmission % : 2.17965653897
+Coverage :  100.0
+----------------------------------------
+EXODUS :
+Broadcast complete time : 46
+Efficient Transmissions : 98
+Inefficient Transmissions : 398
+Success Transmission % : 19.7580645161
+Coverage :  99.0
+----------------------------------------
+
