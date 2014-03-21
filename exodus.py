@@ -101,15 +101,12 @@ class Node:
                 
         # at least one has the packet (packet transfer)
         if self.reached[self.id][0] or node.reached[node.id][0]:
-            #print 'at least one of %d, %d has the packet' % (self.id, node.id)
             self.burden[node.id] = 0
             self.burden[self.id] = 0
         # neither has the packet
         else:
-            #print 'neither has packet'
-            # and they have not met before
+            # neither has packet and they have not met before
             if self.encounters_tbl[self.id].freq_tbl[node.id] == 1:
-                #print 'updating self burdens'
                 self.burden[node.id] += B_RESERVED
                 self.burden[self.id] -= B_RESERVED
 
@@ -150,7 +147,7 @@ class Node:
 class Connection:
 
     @staticmethod
-    def connect(node_i, node_j):
+    def connect_exodus(node_i, node_j):
         #print 'processing connection between', node_i.id, ' and', node_j.id
         if not (node_i.switched_off or node_j.switched_off):
             node_i_copy = copy.deepcopy(node_i)
@@ -180,6 +177,9 @@ class Connection:
                 node_j.reached[node_j.id][0] = node_j.reached[node_i.id][0] = True
 
             if node_i.reached[node_i.id][0] == True and node_j.reached[node_j.id][0] == True:
+                node_i.inefficient_transmissions += 1
+
+            if node_i.reached[node_i.id][0] == False and node_j.reached[node_j.id][0] == False:
                 node_i.inefficient_transmissions += 1
                 
             # update burdens
@@ -353,7 +353,7 @@ class Simulation:
         print 'EXODUS - num switched off :', num_switched_off
         print 'EXODUS - num seeds :', num_seeds
         for edge in self.E_dtn:
-            self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]] = Connection.connect(self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]])
+            self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]] = Connection.connect_exodus(self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]])
         #for node in self.nodes_exodus:
         #    print node
         return False
