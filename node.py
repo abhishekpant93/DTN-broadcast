@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
 import math
+import sys
 
 class Node:
 
@@ -120,7 +121,7 @@ class NodeAnalyzer :
     def update(self):
         self.rehash()
         self.current_connections = []
-        if  float(len(self.completeNodes())) / len(self.nodes)  > .5:
+        if  float(len(self.completeNodes())) / len(self.nodes)  > .8:
             self.mode = "PULL"
         for i ,node in enumerate(self.nodes):
             neighbour_idxs = self.getNeighbours(i)
@@ -181,16 +182,20 @@ class NodeAnalyzer :
         plt.ylim(0, 1)
         plt.title('Delay Tolerant Network')
         line_ani = animation.FuncAnimation(fig1, update_line, 25, fargs=(self , complete , incomplete, empty),
-                                           interval=250)
+
+                       interval=250)
+        
         plt.legend()
         plt.show()
 
 
 
+
 if __name__ == "__main__":
     node_number = 100
-    na = NodeAnalyzer(node_number , .05 , "PUSH")
-
+    connection_dist = .1
+    na = NodeAnalyzer(node_number , connection_dist , sys.argv[1])
+    NodeAnalyzer(node_number , connection_dist, sys.argv[1]).animate()
     iteration = 0
     efficiencies = []
     seed_eff = [0 for i in range( 0 , node_number+1)]
@@ -219,7 +224,7 @@ if __name__ == "__main__":
         iteration += 1
 
     fig1 = plt.figure()
-    plt.plot( range(0 , iteration) , efficiencies ,  'b-' )
+    plt.plot( range(0 , iteration) , efficiencies ,  'bo' )
     plt.title('Efficiency vs Time')
     plt.show()
 
