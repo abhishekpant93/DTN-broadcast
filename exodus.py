@@ -213,22 +213,26 @@ class Simulation:
         self.p_intra_community = p_intra_community
         self.p_inter_community = p_inter_community
         self.p_dtn = p_dtn
-        self.num_nodes = num_nodes
+        #self.num_nodes = num_nodes
         self.num_communities = num_communities
-        self.E_base = self.build_graph()
+        #self.E_base = self.build_graph()
+        self.E_base = self.build_gnutella_graph()
+        self.num_nodes = 6301
         self.E_dtn = []
         self.T = T
         self.exodus = self.push = self.pull = False
         self.modes = list(set([mode.lower() for mode in modes]))
         if "exodus" in self.modes:
             self.exodus = True
-            self.nodes_exodus = [Node(i) for i in xrange(0,num_nodes)]
+            self.nodes_exodus = [Node(i) for i in xrange(0,self.num_nodes)]
         if "push" in self.modes:
             self.push = True
-            self.nodes_push = [Node(i) for i in xrange(0,num_nodes)]
+            self.nodes_push = [Node(i) for i in xrange(0,self.num_nodes)]
+            
+            print "Lenght of nodes_push is " , self.num_nodes
         if "pull" in self.modes:
             self.pull = True
-            self.nodes_pull = [Node(i) for i in xrange(0,num_nodes)]
+            self.nodes_pull = [Node(i) for i in xrange(0,self.num_nodes)]
 
     def simulate(self):
         if self.exodus:
@@ -307,6 +311,8 @@ class Simulation:
         #     return True
         print 'PUSH - num seeds :', num_seeds
         for edge in self.E_dtn:
+            print "Edge is " ,edge[0] , edge[1]
+            print "Len of node_push is " , len(self.nodes_push)
             node_i = self.nodes_push[edge[0]]
             node_j = self.nodes_push[edge[1]]
             if node_i.packets[0] and node_j.packets[0]:
@@ -389,6 +395,14 @@ class Simulation:
                     
         #print 'edges (possible duplicate) :', E
         return E
+
+    def build_gnutella_graph(self):
+        E  = []
+        with open('gnutella.txt' , 'r') as f:
+            for line in f:
+                E.append( map( int , line.split() ) )
+        return E
+
 
     def get_dtn_edges(self):
         E_dtn_temp = []
