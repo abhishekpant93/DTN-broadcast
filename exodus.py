@@ -2,12 +2,13 @@ import random
 import copy
 import time
 from datetime import datetime
+import time
 
 # SIMULATION PARAMETERS
-P_DTN = 0.01
+P_DTN = 0.025
 
 # SYNTHETIC DATASET
-NUM_NODES = 500
+NUM_NODES = 2000
 NUM_COMMUNITIES = 2
 P_INTRA_COMMUNITY = 0.74
 P_INTER_COMMUNITY = 0.45
@@ -149,21 +150,39 @@ class Connection:
     def connect_exodus(node_i, node_j):
         #print 'processing connection between', node_i.id, ' and', node_j.id
         if not (node_i.switched_off or node_j.switched_off):
+            print '~~~~~~~~~~~'
+            times = {}
+            start = time.time()
             node_i_copy = copy.deepcopy(node_i)
             node_j_copy = copy.deepcopy(node_j)
-    
+            finish = time.time()
+            t1  = finish - start
+            print 'node deep copy time :', t1
+            
             # update self frequency tables
+            start = time.time()
             node_i.add_encounter(node_j_copy)
             node_j.add_encounter(node_i_copy)
-
+            finish = time.time()
+            t2 = finish - start
+            print 'update self freq tbl time :', t2
+            
             # merge the encounters arrays
+            start = time.time()
             node_i.union_encounters_tbl(node_j_copy)
             node_j.union_encounters_tbl(node_i_copy)
-
+            finish = time.time()
+            t3 = finish - start
+            print 'merge encounters time :', t3
+            
             # update the nodesets
+            start = time.time()
             node_i.update_nodeset(node_j_copy)
             node_j.update_nodeset(node_i_copy)
-
+            finish = time.time()
+            t4 = finish - start
+            print 'update nodeset time :', t4
+            
             # transfer packet if possible and update efficiency stats
             if node_i.reached[node_i.id][0] == True and node_j.reached[node_j.id][0] == False:
                 node_i.efficient_transmissions += 1
@@ -182,11 +201,26 @@ class Connection:
                 node_i.inefficient_transmissions += 1
                 
             # update burdens
+            start = time.time()
             node_i.update_burden(node_j_copy)
             node_j.update_burden(node_i_copy)
-
+            finish = time.time()
+            t5 = finish - start
+            print 'update burdens time :', t5
+            
+            start = time.time()
             node_i.attempt_terminate()
             node_j.attempt_terminate()
+            finish = time.time()
+            t6 = finish - start
+            print 'attempt terminate time :', t6
+
+            times = [t1, t2, t3, t4, t5, t6]
+            bottleneck = max(times)
+            print 'bottleneck :', bottleneck
+            print 'scaled times :', sorted([t/bottleneck for t in times], reverse = True)
+            
+            print '~~~~~~~~~~~'
             
         elif node_i.switched_off and not node_j.switched_off:
             # transitive termination
@@ -224,10 +258,13 @@ class Simulation:
         B_RESERVED = 1.0 / self.num_nodes ** 2
 
         if "exodus" in self.modes:
+            start = time.time()
             print 'making nodes for exodus'
             self.exodus = True
             self.nodes_exodus = [Node(i, self.num_nodes, B_THRESH, B_INIT, B_RESERVED) for i in xrange(0,self.num_nodes)]
-
+            finish = time.time()
+            print 'time to make nodes :', finish - start
+            
         if "push" in self.modes:
             print 'making nodes for push'
             self.push = True
