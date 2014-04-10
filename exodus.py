@@ -5,10 +5,11 @@ from datetime import datetime
 import time
 
 # SIMULATION PARAMETERS
-P_DTN = 0.025
+P_DTN = 0.05
+ETA = 0.1
 
 # SYNTHETIC DATASET
-NUM_NODES = 2000
+NUM_NODES = 4000
 NUM_COMMUNITIES = 2
 P_INTRA_COMMUNITY = 0.74
 P_INTER_COMMUNITY = 0.45
@@ -67,12 +68,28 @@ class Node:
         self.packets = [False for i in xrange(0,num_pkts)]
         self.num_nodes = num_nodes
         
+    @staticmethod    
+    def copy(node):
+        n = Node(node.id, node.num_nodes, node.B_INIT, node.B_THRESH, node.B_RESERVED, len(node.packets))
+        n.switched_off = node.switched_off
+        n.encounters_tbl = node.encounters_tbl
+        n.burden = node.burden
+        n.nodeset = node.nodeset
+        n.reached = node.reached
+        n.efficient_transmissions = node.efficient_transmissions
+        n.inefficient_transmissions = node.inefficient_transmissions
+        n.packets = node.packets
+        return n
+    
     def attempt_terminate(self):
         cnt = 0
+        if not self.reached[self.id][0]:
+            return
+        
         for i in xrange(0, self.num_nodes):
             if self.burden[i] >= self.B_THRESH and i != self.id:
                 cnt+=1
-        if cnt <= self.num_nodes * 0.1:
+        if cnt <= self.num_nodes * ETA:
             print 'node', self.id, ' switching off'
             self.switched_off = True
 
@@ -150,38 +167,43 @@ class Connection:
     def connect_exodus(node_i, node_j):
         #print 'processing connection between', node_i.id, ' and', node_j.id
         if not (node_i.switched_off or node_j.switched_off):
-            print '~~~~~~~~~~~'
-            times = {}
-            start = time.time()
-            node_i_copy = copy.deepcopy(node_i)
-            node_j_copy = copy.deepcopy(node_j)
-            finish = time.time()
-            t1  = finish - start
-            print 'node deep copy time :', t1
+            # print '~~~~~~~~~~~'
+            # start = time.time()
+            # node_i_copy = copy.deepcopy(node_i)
+            # node_j_copy = copy.deepcopy(node_j)
+            # finish = time.time()
+            # t0 = finish - start
+            # print 'node deep copy time :', t0
+            # start = time.time()
+            node_i_copy = Node.copy(node_i)
+            node_j_copy = Node.copy(node_j)
+            # finish = time.time()
+            # t1  = finish - start
+            # print 'node custom copy time :', t1
             
             # update self frequency tables
-            start = time.time()
+            # start = time.time()
             node_i.add_encounter(node_j_copy)
             node_j.add_encounter(node_i_copy)
-            finish = time.time()
-            t2 = finish - start
-            print 'update self freq tbl time :', t2
+            # finish = time.time()
+            # t2 = finish - start
+            # print 'update self freq tbl time :', t2
             
             # merge the encounters arrays
-            start = time.time()
+            # start = time.time()
             node_i.union_encounters_tbl(node_j_copy)
             node_j.union_encounters_tbl(node_i_copy)
-            finish = time.time()
-            t3 = finish - start
-            print 'merge encounters time :', t3
+            # finish = time.time()
+            # t3 = finish - start
+            # print 'merge encounters time :', t3
             
             # update the nodesets
-            start = time.time()
+            # start = time.time()
             node_i.update_nodeset(node_j_copy)
             node_j.update_nodeset(node_i_copy)
-            finish = time.time()
-            t4 = finish - start
-            print 'update nodeset time :', t4
+            # finish = time.time()
+            # t4 = finish - start
+            # print 'update nodeset time :', t4
             
             # transfer packet if possible and update efficiency stats
             if node_i.reached[node_i.id][0] == True and node_j.reached[node_j.id][0] == False:
@@ -201,33 +223,32 @@ class Connection:
                 node_i.inefficient_transmissions += 1
                 
             # update burdens
-            start = time.time()
+            # start = time.time()
             node_i.update_burden(node_j_copy)
             node_j.update_burden(node_i_copy)
-            finish = time.time()
-            t5 = finish - start
-            print 'update burdens time :', t5
+            # finish = time.time()
+            # t5 = finish - start
+            # print 'update burdens time :', t5
             
-            start = time.time()
+            # start = time.time()
             node_i.attempt_terminate()
             node_j.attempt_terminate()
-            finish = time.time()
-            t6 = finish - start
-            print 'attempt terminate time :', t6
+            # finish = time.time()
+            # t6 = finish - start
+            # print 'attempt terminate time :', t6
 
-            times = [t1, t2, t3, t4, t5, t6]
-            bottleneck = max(times)
-            print 'bottleneck :', bottleneck
-            print 'scaled times :', sorted([t/bottleneck for t in times], reverse = True)
-            
-            print '~~~~~~~~~~~'
+            # times = [t0, t1, t2, t3, t4, t5, t6]
+            # bottleneck = max(times)
+            # print 'bottleneck :', bottleneck
+            # print 'scaled times :', sorted([t/bottleneck for t in times], reverse = True)
+            # print '~~~~~~~~~~~'
             
         elif node_i.switched_off and not node_j.switched_off:
             # transitive termination
             for k in xrange(0,node_i.num_nodes):
                 if node_i.burden[k] == 0:
                     node_j.burden[k] = 0
-                    
+            node_j.reached[node_j.id][0] = True        
             node_j.attempt_terminate()
                     
         elif node_j.switched_off and not node_i.switched_off:
@@ -235,7 +256,7 @@ class Connection:
             for k in xrange(0,node_j.num_nodes):
                 if node_j.burden[k] == 0:
                     node_i.burden[k] = 0
-                    
+            node_i.reached[node_i.id][0] = True
             node_i.attempt_terminate()
                     
         return node_i, node_j
@@ -315,11 +336,18 @@ class Simulation:
             #time.sleep(random.randint(0,1000) / 1000000.0)        
             t += 1
             print '########################################################'
+        
+        if self.exodus and status_exodus == "running":
+            for node in self.nodes_exodus:
+                if not node.switched_off:
+                    print node
             
         self.statistics(t_push, t_pull, t_exodus)
             
     def statistics(self, t_push, t_pull, t_exodus):
         print '\n\n##### STATISTICS #####'
+        print 'num_nodes = ', self.num_nodes
+        print 'T = ', self.T
         if self.push:
             print 'PUSH :'
             print 'Broadcast complete time :', t_push
@@ -400,6 +428,8 @@ class Simulation:
         print 'EXODUS - num seeds :', num_seeds
         for edge in self.E_dtn:
             self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]] = Connection.connect_exodus(self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]])
+        # for node in self.nodes_exodus:
+        #     print node
         return False
         
     def build_graph(self, edge_file = None):
@@ -447,19 +477,17 @@ class Simulation:
         E_dtn_temp = []
         E_dtn = []
         num_edges = len(self.E_base)
-        expected = int(self.p_dtn * num_edges)
+        expected = int(self.p_dtn * num_edges + 1)
         for i in xrange(0,expected):
             E_dtn_temp.append(self.E_base[random.randint(0,num_edges-1)])
-        # for edge in self.E_base:
-        #     p = random.uniform(0,1)
-        #     if p < self.p_dtn:
-        #         E_dtn_temp.append(edge)
                 
         deg = [0 for i in xrange(0,self.num_nodes)]
         for edge in E_dtn_temp:
             if deg[edge[0]] == 0 and deg[edge[1]] == 0:
                 E_dtn.append(edge)
                 deg[edge[0]] = deg[edge[1]] = 1
+        #print 'num edges : ', num_edges
+        #print E_dtn
         return E_dtn        
         
 if __name__ == "__main__":
@@ -467,8 +495,8 @@ if __name__ == "__main__":
     modes = ["push", "exodus"]
     
     # use downloaded dataset
-    #simulator = Simulation( NUM_COMMUNITIES, P_INTRA_COMMUNITY, P_INTER_COMMUNITY, P_DTN, T, "facebook_combined.txt", modes)
-    
+    #simulator = Simulation( modes, 500, 1, "facebook_combined.txt")
+
     # use synthetic dataset
     simulator = Simulation(modes, T)
     
