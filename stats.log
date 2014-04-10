@@ -47,6 +47,23 @@ Success Transmission % : 19.7580645161
 Coverage :  99.0
 ----------------------------------------
 
+3. N = 2000, T = 250
+##### STATISTICS #####
+PUSH :
+Broadcast complete time : 250
+Efficient Transmissions : 1999
+Inefficient Transmissions : 219249
+Success Transmission % : 0.90351099219
+Coverage :  100.0
+----------------------------------------
+EXODUS :
+Broadcast complete time : 213
+Efficient Transmissions : 1941
+Inefficient Transmissions : 12389
+Success Transmission % : 13.5450104676
+Coverage :  97.1
+----------------------------------------
+
 4. ##### STATISTICS #####
 (Facebook network)
 num_nodes =  4039
@@ -82,4 +99,3 @@ Efficient Transmissions : 3920
 Inefficient Transmissions : 27768
 Success Transmission % : 12.3706134814
 Coverage :  100.0
-----------------------------------------
