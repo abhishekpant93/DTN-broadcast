@@ -4,17 +4,19 @@ import time
 from datetime import datetime
 import time
 
+
+DEBUG = False
 # SIMULATION PARAMETERS
-P_DTN = 0.05
+P_DTN = 0.01
 ETA = 0.1
 
 # SYNTHETIC DATASET
-NUM_NODES = 4000
-NUM_COMMUNITIES = 2
-P_INTRA_COMMUNITY = 0.74
-P_INTER_COMMUNITY = 0.45
+NUM_NODES = 500
+NUM_COMMUNITIES = 1
+P_INTRA_COMMUNITY = 0.75
+P_INTER_COMMUNITY = 0.35
 
-T = 250
+T = 108
 
 class Encounters:
     
