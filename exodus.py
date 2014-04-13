@@ -24,27 +24,26 @@ if len(sys.argv)  >2:
 else:
     ITERS = 1
     
-NUM_COMMUNITIES = 5
-P_INTRA_COMMUNITY = 0.75
-P_INTER_COMMUNITY = 0.35
+NUM_COMMUNITIES = 2
+P_INTRA_COMMUNITY = 0.85
+P_INTER_COMMUNITY = 0.45
 
-T = 300
+T = 500
 
 active_nodes = []
 num_seeds_total = []
 efficient_exodus = []
-efficient_push = []
+efficient_push_pull = []
 inefficient_exodus = []
-inefficient_push = []
+inefficient_push_pull = []
 
 def reset_shit():
     del active_nodes[:]
     del num_seeds_total[:]
     del efficient_exodus[:]
-    del efficient_push[:]
+    del efficient_push_pull[:]
     del inefficient_exodus[:]
     del inefficient_push[:]
-
 
     
 class Encounters:
@@ -155,6 +154,7 @@ class Node:
             self.burden[self.id] = 0
         # neither has the packet
         else:
+            # each other's burdens
             # neither has packet and they have not met before
             if self.encounters_tbl[self.id].freq_tbl[node.id] == 1:
                 self.burden[node.id] += self.B_RESERVED
@@ -162,17 +162,24 @@ class Node:
 
         for k in self.nodeset:
             if k!=self.id and k!=node.id and self.burden[k]!=0:
+                temp = self.burden[k]
+                case = -1
                 if self.has_met(self.id, k) and self.has_met(node.id, k):
+                    case = 1
                     n_self_k = self.encounters_tbl[self.id].freq_tbl[k]
                     n_node_k = self.encounters_tbl[node.id].freq_tbl[k]
                     self.burden[k] = ( float(n_self_k) / (n_self_k + n_node_k) ) * (self.burden[k] + node.burden[k])
-                elif not self.has_met(self.id, k) and self.has_met(node.id, k):
+                elif not self.has_met(self.id, k) and self.has_met(node.id, k) and self.encounters_tbl[self.id].freq_tbl[node.id] == 1:
+                    case = 2
                     self.burden[k] -= self.B_RESERVED
-                elif self.has_met(self.id, k) and not self.has_met(node.id, k) :
+                elif self.has_met(self.id, k) and not self.has_met(node.id, k) and self.encounters_tbl[self.id].freq_tbl[node.id] == 1:
+                    case = 3
                     self.burden[k] += self.B_RESERVED
                 else:
+                    case = 4
                     self.burden[k] = 0.5 * ( self.burden[k] + node.burden[k] )
-        
+                    
+                print 'burden update : node id ', self.id, 'for k = ', k, ' new = ', self.burden[k], ' old = ', temp,' case = ', case
         
     def __str__(self):
         s = ""
@@ -180,8 +187,8 @@ class Node:
         s+= 'node_id : %d\n' % self.id
         s+= 'switched_off : ' + str(self.switched_off) + '\n'
         s+= 'burden : ' + str(self.burden) + '\n'
-        s+= 'nodeset : ' + str(self.nodeset) + '\n'
-        s+= 'encounters_tbl ' + str(self.encounters_tbl) + '\n'
+        #s+= 'nodeset : ' + str(self.nodeset) + '\n'
+        #s+= 'encounters_tbl ' + str(self.encounters_tbl) + '\n'
         return s
 
     def __repr__(self):
@@ -190,39 +197,26 @@ class Node:
         s+= 'node_id : %d\n' % self.id
         s+= 'switched_off : ' + str(self.switched_off) + '\n'
         s+= 'burden : ' + str(self.burden) + '\n'
-        s+= 'nodeset : ' + str(self.nodeset) + '\n'
-        s+= 'encounters_tbl ' + str(self.encounters_tbl) + '\n'
+        #s+= 'nodeset : ' + str(self.nodeset) + '\n'
+        #s+= 'encounters_tbl ' + str(self.encounters_tbl) + '\n'
         return s
-    
+
+def get_total_burdens(nodes):
+    return [sum([node.burden[i] for i in xrange(len(nodes))]) for node in nodes]
+
 class Connection:
     @staticmethod
     def connect_exodus(node_i, node_j):
-        #print 'processing connection between', node_i.id, ' and', node_j.id
-
-        inefficient = 1
-        efficient = 1
+        inefficient = 0
+        efficient = 0
         if not (node_i.switched_off or node_j.switched_off):
-            # print '~~~~~~~~~~~'
-            # start = time.time()
-            # node_i_copy = copy.deepcopy(node_i)
-            # node_j_copy = copy.deepcopy(node_j)
-            # finish = time.time()
-            # t0 = finish - start
-            # print 'node deep copy time :', t0
-            # start = time.time()
+            
             node_i_copy = Node.copy(node_i)
             node_j_copy = Node.copy(node_j)
-            # finish = time.time()
-            # t1  = finish - start
-            # print 'node custom copy time :', t1
             
             # update self frequency tables
-            # start = time.time()
             node_i.add_encounter(node_j_copy)
             node_j.add_encounter(node_i_copy)
-            # finish = time.time()
-            # t2 = finish - start
-            # print 'update self freq tbl time :', t2
             
             # merge the encounters arrays
             # start = time.time()
@@ -241,19 +235,21 @@ class Connection:
             # print 'update nodeset time :', t4
             
             # transfer packet if possible and update efficiency stats
-
-
             if node_i.reached[node_i.id][0] == True and node_j.reached[node_j.id][0] == False:
                 node_i.efficient_transmissions += 1
                 node_i.reached[node_i.id][0] = node_i.reached[node_j.id][0] = True
                 node_j.reached[node_j.id][0] = node_j.reached[node_i.id][0] = True
                 efficient += 1
+                if DEBUG:
+                    print 'exodus : efficient transmission : ', node_i.id, node_j.id
 
             if node_i.reached[node_i.id][0] == False and node_j.reached[node_j.id][0] == True:
                 node_j.efficient_transmissions += 1
                 node_i.reached[node_i.id][0] = node_i.reached[node_j.id][0] = True
                 node_j.reached[node_j.id][0] = node_j.reached[node_i.id][0] = True
                 efficient += 1
+                if DEBUG:
+                    print 'exodus : efficient transmission : ', node_i.id, node_j.id
 
             if node_i.reached[node_i.id][0] == True and node_j.reached[node_j.id][0] == True:
                 if DEBUG:
@@ -265,8 +261,7 @@ class Connection:
                 if DEBUG:
                     print 'exodus - inefficient transmission : ', node_i.id, node_j.id
                 node_i.inefficient_transmissions += 1
-                inefficient += 1        
-
+                inefficient += 1    
                 
             # update burdens
             # start = time.time()
@@ -313,7 +308,7 @@ class Connection:
                 print 'exodus - inefficient transmission (switched off): ', node_i.id, node_j.id
             node_i.attempt_terminate()
         efficient_exodus[-1] +=efficient
-        inefficient_exodus[-1] +=inefficient    
+        inefficient_exodus[-1] +=inefficient
         return node_i, node_j
         
 class Simulation:
@@ -325,9 +320,10 @@ class Simulation:
         self.p_dtn = P_DTN
         self.num_communities = NUM_COMMUNITIES
         self.num_nodes, self.E_base = self.build_graph(edge_file)
+        print self.E_base
         self.E_dtn = []
         self.T = T
-        self.exodus = self.push = self.pull = False
+        self.exodus = self.push = self.push_pull = False
         self.modes = list(set([mode.lower() for mode in modes]))
         self.plot = plot
         B_THRESH = 1.0 / self.num_nodes
@@ -347,23 +343,23 @@ class Simulation:
             self.push = True
             self.nodes_push = [Node(i, self.num_nodes, B_THRESH, B_INIT, B_RESERVED) for i in xrange(0,self.num_nodes)]
 
-        if "pull" in self.modes:
-            print 'making nodes for pull'
-            self.pull = True
-            self.nodes_pull = [Node(i, self.num_nodes, B_THRESH, B_INIT, B_RESERVED) for i in xrange(0,self.num_nodes)]
+        if "push-pull" in self.modes:
+            print 'making nodes for push-pull'
+            self.push_pull = True
+            self.nodes_push_pull = [Node(i, self.num_nodes, B_THRESH, B_INIT, B_RESERVED) for i in xrange(0,self.num_nodes)]
                     
 
     def simulate(self):
         print 'starting simulation'
         if self.exodus:
-            self.nodes_exodus[0].reached[0][0] = True
+            self.nodes_exodus[0].reached[0][0] = False
         if self.push:
             self.nodes_push[0].packets[0] = True
-        if self.pull:
-            self.nodes_pull[0].packets[0] = True
+        if self.push_pull:
+            self.nodes_push_pull[0].packets[0] = True
         t = 0
-        status = status_exodus = status_push = status_pull = "running"
-        t_push = t_pull = t_exodus = 0
+        status = status_exodus = status_push = status_push_pull = "running"
+        t_push = t_push_pull = t_exodus = 0
         while t < self.T:
             self.E_dtn = self.get_dtn_edges()
             print 't :', t
@@ -375,43 +371,60 @@ class Simulation:
                 print 'done'
                 print '----------------------------------------------------'
                 t_push += 1
-            if self.pull and status_pull == "running":
-                print 'simulating pull step ...'
-                if self.simulate_step_pull():
-                    status_pull = "terminated"
+            if self.push_pull and status_push_pull == "running":
+                print 'simulating push-pull step ...'
+                if self.simulate_step_push_pull()  or status_exodus == "terminated":
+                    status_push_pull = "terminated"
                 print 'done'
                 print '----------------------------------------------------'
-                t_pull += 1
+                t_push_pull += 1
             if self.exodus and status_exodus == "running":
                 print 'simulating exodus step ...'        
                 if self.simulate_step_exodus():
                     status_exodus = "terminated"
-
-
                 print 'done'
                 print '----------------------------------------------------'
                 t_exodus += 1
-            #time.sleep(random.randint(0,1000) / 1000000.0)        
+            
+            if not (status_exodus == "running" or status_push == "running" or status_push_pull == "running"):
+                break
             t += 1
             print '########################################################'
-        
-        if self.exodus and status_exodus == "running":
-            for node in self.nodes_exodus:
-                if not node.switched_off:
-                    print node
             
-        self.statistics(t_push, t_pull, t_exodus)
+        self.statistics(t_push, t_push_pull, t_exodus)
+
+        tot = 0
+        for i in xrange(self.num_nodes):
+            b = 0
+            for node in self.nodes_exodus:
+                b += node.burden[i]
+            tot += b
+            print 'total burden for i = ', i, ' is ', b
+        print 'tot burden in sysem = ', tot, ' | should be ', self.num_nodes
+            
+        for node in self.nodes_exodus:                
+            print node
+            
         if self.plot:            
             fig1 = plt.figure()
             print len(active_nodes) , t_exodus
-            plt.plot( range(0 , len(active_nodes)) , active_nodes  , 'b-' , label = "active nodes")
-            plt.plot(   range(0 , len(num_seeds_total)) , num_seeds_total,  'r-' ,  label = "num_seeds_total" )
+
+            plt.plot( range(0 , len(active_nodes)) , [float(active)/self.num_nodes for active in active_nodes]  , 'b-' , label = "active nodes")
+            plt.plot(   range(0 , len(num_seeds_total)) , [float(seeds)/self.num_nodes for seeds in num_seeds_total],  'r-' ,  label = "num_seeds_total" )
             plt.title('Nodes vs Time')
             plt.legend()
 
+            fig1 = plt.figure()
+            #plt.plot(   range(0 , len(efficient_exodus)) , [ efficient_exodus[i] / ( float(inefficient_exodus[i] + efficient_exodus[i]) if float(inefficient_exodus[i] + efficient_exodus[i]) else 1 )for i in xrange( len(efficient_exodus))],  'go' ,  label = "Exodus efficient" )
+            #plt.plot(   range(0 , len(efficient_push)) , [ efficient_push[i] / (float(inefficient_push[i] + efficient_push[i]) if float(inefficient_push[i] + efficient_push[i]) else 1 )for i in xrange( len(efficient_push))],  'yo' ,  label = "Push efficient" )
+            plt.plot(   range(0 , len(efficient_exodus)) ,  efficient_exodus,  'g-' ,  label = "Exodus efficient" )
+            plt.plot(   range(0 , len(inefficient_exodus)) ,  inefficient_exodus,  'r-' ,  label = "Exodus inefficient" )
+
             fig2 = plt.figure()
-            plt.plot(   range(0 , len(efficient_exodus)) , [ efficient_exodus[i] / float(inefficient_exodus[i] + efficient_exodus[i] )for i in xrange( len(efficient_exodus))],  'b-' ,  label = "Exodus efficient" )
-            plt.plot(   range(0 , len(efficient_push)) , [ efficient_push[i] / float(inefficient_push[i] + efficient_push[i] )for i in xrange( len(efficient_push))],  'r-' ,  label = "Push efficient" )
+            plt.plot(   range(0 , len(efficient_push_pull)) ,  efficient_push_pull,  'g-' ,  label = "Push-Pull efficient" )
+            plt.plot(   range(0 , len(inefficient_push_pull)) ,  inefficient_push_pull,  'r-' ,  label = "Push-Pull inefficient" )
+
+
             plt.title('Efficiency vs Time')
             plt.legend()
             plt.show()            
@@ -419,7 +432,7 @@ class Simulation:
                     
                     
             
-    def statistics(self, t_push, t_pull, t_exodus):
+    def statistics(self, t_push, t_push_pull, t_exodus):
         print '\n\n##### STATISTICS #####'
         print 'num_nodes = ', self.num_nodes
         print 'T = ', self.T
@@ -433,15 +446,15 @@ class Simulation:
             print 'Success Transmission % :', 100.0 * float(eff) / (eff + ineff)
             print 'Coverage : ', 100.0 * len([node for node in self.nodes_push if node.packets[0]]) / self.num_nodes
             print '----------------------------------------'
-        if self.pull:
-            print 'PULL :'
-            print 'Broadcast complete time :', t_pull
-            eff = sum([node.efficient_transmissions for node in self.nodes_pull])
-            ineff = sum([node.inefficient_transmissions for node in self.nodes_pull])
+        if self.push_pull:
+            print 'PUSH-PULL :'
+            print 'Broadcast complete time :', t_push_pull
+            eff = sum([node.efficient_transmissions for node in self.nodes_push_pull])
+            ineff = sum([node.inefficient_transmissions for node in self.nodes_push_pull])
             print 'Efficient Transmissions :', eff
             print 'Inefficient Transmissions :', ineff
             print 'Success Transmission % :', 100.0 * float(eff) / (eff + ineff)
-            print 'Coverage : ', 100.0 * len([node for node in self.nodes_pull if node.packets[0]]) / self.num_nodes
+            print 'Coverage : ', 100.0 * len([node for node in self.nodes_push_pull if node.packets[0]]) / self.num_nodes
             print '----------------------------------------'
         if self.exodus:
             print 'EXODUS :'
@@ -457,8 +470,8 @@ class Simulation:
             
     def simulate_step_push(self):
         num_seeds = len([node for node in self.nodes_push if node.packets[0]])
-        efficient = 1
-        inefficient = 1
+        efficient = 0
+        inefficient = 0
         print 'PUSH - num seeds :', num_seeds
         for edge in self.E_dtn:
             node_i = self.nodes_push[edge[0]]
@@ -471,9 +484,13 @@ class Simulation:
             if node_i.packets[0] and not node_j.packets[0]:
                 node_i.efficient_transmissions += 1
                 node_j.packets[0] = True
+                if DEBUG:
+                    print 'push : efficient transmission : ', node_i.id, node_j.id
                 efficient +=1 
             if not node_i.packets[0] and node_j.packets[0]:
                 node_j.efficient_transmissions += 1
+                if DEBUG:
+                    print 'push : efficient transmission : ', node_i.id, node_j.id
                 efficient +=1
                 node_i.packets[0] = True
             self.nodes_push[edge[0]] = node_i
@@ -482,23 +499,54 @@ class Simulation:
         inefficient_push.append(inefficient)    
         return False
 
-    def simulate_step_pull(self):
-        num_seeds = len([node for node in self.nodes_pull if node.packets[0]])
-        print 'PULL - num seeds :', num_seeds
-        for edge in self.E_dtn:
-            node_i = self.nodes_pull[edge[0]]
-            node_j = self.nodes_pull[edge[1]]
-            if not node_i.packets[0] and not node_j.packets[0]:
-                node_i.inefficient_transmissions += 1
-            if node_i.packets[0] and not node_j.packets[0]:
-                node_j.efficient_transmissions += 1
-                node_j.packets[0] = True
-            if not node_i.packets[0] and node_j.packets[0]:
-                node_i.efficient_transmissions += 1
-                node_i.packets[0] = True
-            self.nodes_pull[edge[0]] = node_i
-            self.nodes_pull[edge[1]] = node_j
-            
+    def simulate_step_push_pull(self):
+        num_seeds = len([node for node in self.nodes_push_pull if node.packets[0]])
+        efficient = 0
+        inefficient = 0
+        print 'PUSH-PULL - num seeds :', num_seeds
+        
+        if num_seeds < 0.8 * self.num_nodes:
+            print 'push'
+            for edge in self.E_dtn:
+                node_i = self.nodes_push_pull[edge[0]]
+                node_j = self.nodes_push_pull[edge[1]]
+                if node_i.packets[0] and node_j.packets[0]:
+                    node_i.inefficient_transmissions += 1
+                    inefficient +=1
+                if node_i.packets[0] and not node_j.packets[0]:
+                    node_i.efficient_transmissions += 1
+                    node_j.packets[0] = True
+                    efficient +=1 
+                if not node_i.packets[0] and node_j.packets[0]:
+                    node_j.efficient_transmissions += 1
+                    efficient +=1
+                    node_i.packets[0] = True
+
+                self.nodes_push_pull[edge[0]] = node_i
+                self.nodes_push_pull[edge[1]] = node_j
+                    
+        else:
+            print 'pull'
+            for edge in self.E_dtn:
+                node_i = self.nodes_push_pull[edge[0]]
+                node_j = self.nodes_push_pull[edge[1]]
+                if not node_i.packets[0] and not node_j.packets[0]:
+                    node_i.inefficient_transmissions += 1
+                    inefficient +=1
+                if node_i.packets[0] and not node_j.packets[0]:
+                    node_i.efficient_transmissions += 1
+                    node_j.packets[0] = True
+                    efficient +=1 
+                if not node_i.packets[0] and node_j.packets[0]:
+                    node_j.efficient_transmissions += 1
+                    efficient +=1
+                    node_i.packets[0] = True
+
+                self.nodes_push_pull[edge[0]] = node_i
+                self.nodes_push_pull[edge[1]] = node_j
+                    
+        efficient_push_pull.append(efficient)
+        inefficient_push_pull.append(inefficient)    
         return False
             
     def simulate_step_exodus(self):
@@ -515,8 +563,8 @@ class Simulation:
         inefficient_exodus.append(0)
         for edge in self.E_dtn:
             self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]] = Connection.connect_exodus(self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]])
-        # for node in self.nodes_exodus:
-        #     print node
+        burdens = get_total_burdens(self.nodes_exodus)
+        print 'burdens :', burdens, 'total : ', sum(burdens)
         return False
         
     def build_graph(self, edge_file = None):
@@ -568,47 +616,42 @@ class Simulation:
         for i in xrange(0,expected):
             E_dtn_temp.append(self.E_base[random.randint(0,num_edges-1)])
 
-
         deg = [0 for i in xrange(0,self.num_nodes)]
         for edge in E_dtn_temp:
             if deg[edge[0]] == 0 and deg[edge[1]] == 0:
                 E_dtn.append(edge)
                 deg[edge[0]] = deg[edge[1]] = 1
-
-        
+      
         if DEBUG:
             print E_dtn
         return E_dtn        
 
-
-
-
-
     
 if __name__ == "__main__":
 
-    modes = ["push", "exodus"]
+    modes = ["exodus"]
     
     # use downloaded dataset
-    #simulator = Simulation( modes, 500, 1, "facebook_combined.txt")
-
-# use synthetic dataset
-    time_list = []
-    for i in xrange(100,1001 , 100):
-        NUM_NODES= i
-        print "NUM_NODES is " , NUM_NODES
-        total_time_taken = 0
-        for j in xrange(0 ,5):
-            simulator = Simulation(modes, T )
-            ret_dict = simulator.simulate()
-            reset_shit()
-            total_time_taken += ret_dict["exodus_time"]
+    #simulator = Simulation( modes, 2000, 1, "facebook_combined.txt", plot = True)
+    simulator = Simulation(modes , T)
+    simulator.simulate()
+    exit()
+    
+    # use synthetic dataset
+    cum_switched_off = []
+    for i in xrange(1,12 , 2):
+        NUM_COMMUNITIES = i
+        print "NUM_COMMUNITIES is " , NUM_COMMUNITIES        
+        simulator = Simulation(modes, T )
+        simulator.simulate()
+        cum_switched_off.append(active_nodes)
+        reset_shit()
             
-        time_list.append(total_time_taken / 5)
-    fig = plt.figure()
-    plt.plot( xrange(100,1001 , 100) ,  time_list  , 'bo' )
-    plt.title("Time taken vs nodes")
-    plt.show()
+    # fig = plt.figure()
+    # for i in xrange(len(cum_switched_off)):
+    #     plt.plot( ,  time_list  , 'bo' )
+    # plt.title("Time taken vs nodes")
+    # plt.show()
 
 
         
