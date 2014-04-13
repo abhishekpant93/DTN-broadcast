@@ -24,11 +24,11 @@ if len(sys.argv)  >2:
 else:
     ITERS = 1
     
-NUM_COMMUNITIES = 2
+NUM_COMMUNITIES = 5
 P_INTRA_COMMUNITY = 0.85
-P_INTER_COMMUNITY = 0.45
+P_INTER_COMMUNITY = 0.35
 
-T = 500
+T = 1000
 
 active_nodes = []
 num_seeds_total = []
@@ -140,46 +140,64 @@ class Node:
                 self.encounters_tbl[k].update(node.encounters_tbl[k])
             else:
                 self.encounters_tbl[k] = node.encounters_tbl[k]
-    
-    def update_burden(self, node):
+
+    @staticmethod
+    def update_burden( nodei , nodej):
         #print 'updating burden for node %d with node %d' % (self.id, node.id)
         # transitive termination
-        for i in xrange(0,self.num_nodes):
-            if node.burden[i] == 0:
-                self.burden[i] = 0
-                
+        for i in xrange(0,nodei.num_nodes):
+            if nodej.burden[i] == 0:
+                nodei.burden[i] = 0
+
+        for i in xrange(0,nodej.num_nodes):
+            if nodei.burden[i] == 0:
+                nodej.burden[i] = 0
+
         # at least one has the packet (packet transfer)
-        if self.reached[self.id][0] or node.reached[node.id][0]:
-            self.burden[node.id] = 0
-            self.burden[self.id] = 0
+        if nodei.reached[nodei.id][0] or nodej.reached[nodej.id][0]:
+            nodei.burden[nodej.id] = 0
+            nodei.burden[nodei.id] = 0
+            nodej.burden[nodei.id] = 0
+            nodej.burden[nodej.id] = 0
+
         # neither has the packet
         else:
             # each other's burdens
             # neither has packet and they have not met before
-            if self.encounters_tbl[self.id].freq_tbl[node.id] == 1:
-                self.burden[node.id] += self.B_RESERVED
-                self.burden[self.id] -= self.B_RESERVED
+            if nodei.encounters_tbl[nodei.id].freq_tbl[nodej.id] == 1:
+                
+                nodej.burden[nodei.id] += nodej.B_RESERVED
+                nodej.burden[nodej.id] -= nodej.B_RESERVED
 
-        for k in self.nodeset:
-            if k!=self.id and k!=node.id and self.burden[k]!=0:
-                temp = self.burden[k]
+                nodei.burden[nodej.id] += nodei.B_RESERVED
+                nodei.burden[nodei.id] -= nodei.B_RESERVED
+
+        for k in nodei.nodeset:
+            if k!=nodei.id and k!=nodej.id and nodei.burden[k]!=0:
+                temp = nodei.burden[k]
                 case = -1
-                if self.has_met(self.id, k) and self.has_met(node.id, k):
+                if nodei.has_met(nodei.id, k) and nodei.has_met(nodej.id, k):
                     case = 1
-                    n_self_k = self.encounters_tbl[self.id].freq_tbl[k]
-                    n_node_k = self.encounters_tbl[node.id].freq_tbl[k]
-                    self.burden[k] = ( float(n_self_k) / (n_self_k + n_node_k) ) * (self.burden[k] + node.burden[k])
-                elif not self.has_met(self.id, k) and self.has_met(node.id, k) and self.encounters_tbl[self.id].freq_tbl[node.id] == 1:
+                    n_nodei_k = nodei.encounters_tbl[nodei.id].freq_tbl[k]
+                    n_nodej_k = nodei.encounters_tbl[nodej.id].freq_tbl[k]
+                    nodei_old_burden = nodei.burden[k]
+                    nodei.burden[k] = ( float(n_nodei_k) / (n_nodei_k + n_nodej_k) ) * (nodei.burden[k] + nodej.burden[k])
+                    nodej.burden[k] = ( float(n_nodej_k) / (n_nodei_k + n_nodej_k) ) * (nodei_old_burden + nodej.burden[k])
+                elif not nodei.has_met(nodei.id, k) and nodei.has_met(nodej.id, k) and nodei.encounters_tbl[nodei.id].freq_tbl[nodej.id] == 1:
                     case = 2
-                    self.burden[k] -= self.B_RESERVED
-                elif self.has_met(self.id, k) and not self.has_met(node.id, k) and self.encounters_tbl[self.id].freq_tbl[node.id] == 1:
+                    nodei.burden[k] -= nodei.B_RESERVED
+                    nodej.burden[k] += nodej.B_RESERVED
+                elif nodei.has_met(nodei.id, k) and not nodei.has_met(nodej.id, k) and nodei.encounters_tbl[nodei.id].freq_tbl[nodej.id] == 1:
                     case = 3
-                    self.burden[k] += self.B_RESERVED
+                    nodei.burden[k] += nodei.B_RESERVED
+                    nodej.burden[k] -= nodej.B_RESERVED
                 else:
                     case = 4
-                    self.burden[k] = 0.5 * ( self.burden[k] + node.burden[k] )
+                    nodei_old_burden = nodei.burden[k]
+                    nodei.burden[k] = 0.5 * ( nodei.burden[k] + nodej.burden[k] )
+                    nodej.burden[k] = 0.5 * ( nodei_old_burden + nodej.burden[k] )
                     
-                print 'burden update : node id ', self.id, 'for k = ', k, ' new = ', self.burden[k], ' old = ', temp,' case = ', case
+                    #print 'burden update : nodej id ', nodei.id, 'for k = ', k, ' new = ', nodei.burden[k], ' old = ', temp,' case = ', case
         
     def __str__(self):
         s = ""
@@ -265,8 +283,9 @@ class Connection:
                 
             # update burdens
             # start = time.time()
-            node_i.update_burden(node_j_copy)
-            node_j.update_burden(node_i_copy)
+            #node_i.update_burden(node_j_copy)
+            #node_j.update_burden(node_i_copy)
+            Node.update_burden(node_i , node_j)
             # finish = time.time()
             # t5 = finish - start
             # print 'update burdens time :', t5
@@ -320,7 +339,7 @@ class Simulation:
         self.p_dtn = P_DTN
         self.num_communities = NUM_COMMUNITIES
         self.num_nodes, self.E_base = self.build_graph(edge_file)
-        print self.E_base
+        #print self.E_base
         self.E_dtn = []
         self.T = T
         self.exodus = self.push = self.push_pull = False
@@ -352,7 +371,7 @@ class Simulation:
     def simulate(self):
         print 'starting simulation'
         if self.exodus:
-            self.nodes_exodus[0].reached[0][0] = False
+            self.nodes_exodus[0].reached[0][0] = True
         if self.push:
             self.nodes_push[0].packets[0] = True
         if self.push_pull:
@@ -360,7 +379,7 @@ class Simulation:
         t = 0
         status = status_exodus = status_push = status_push_pull = "running"
         t_push = t_push_pull = t_exodus = 0
-        while t < self.T:
+        while t < self.T and status_exodus == "running":
             self.E_dtn = self.get_dtn_edges()
             print 't :', t
             print 'len E_dtn :', len(self.E_dtn)
@@ -399,11 +418,9 @@ class Simulation:
             for node in self.nodes_exodus:
                 b += node.burden[i]
             tot += b
-            print 'total burden for i = ', i, ' is ', b
-        print 'tot burden in sysem = ', tot, ' | should be ', self.num_nodes
+            #nprint 'total burden for i = ', i, ' is ', b
+            #print 'tot burden in sysem = ', tot, ' | should be ', self.num_nodes
             
-        for node in self.nodes_exodus:                
-            print node
             
         if self.plot:            
             fig1 = plt.figure()
@@ -564,7 +581,7 @@ class Simulation:
         for edge in self.E_dtn:
             self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]] = Connection.connect_exodus(self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]])
         burdens = get_total_burdens(self.nodes_exodus)
-        print 'burdens :', burdens, 'total : ', sum(burdens)
+        #print 'burdens :', burdens, 'total : ', sum(burdens)
         return False
         
     def build_graph(self, edge_file = None):
@@ -629,11 +646,11 @@ class Simulation:
     
 if __name__ == "__main__":
 
-    modes = ["exodus"]
+    modes = ["exodus", "push-pull"]
     
     # use downloaded dataset
     #simulator = Simulation( modes, 2000, 1, "facebook_combined.txt", plot = True)
-    simulator = Simulation(modes , T)
+    simulator = Simulation(modes , T , plot = True)
     simulator.simulate()
     exit()
     
