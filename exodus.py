@@ -34,8 +34,10 @@ T = 2000
 active_nodes = []
 num_seeds_total = []
 efficient_exodus = []
+efficient_push = []
 efficient_push_pull = []
 inefficient_exodus = []
+inefficient_push = []
 inefficient_push_pull = []
 
 def reset_shit():
@@ -45,6 +47,8 @@ def reset_shit():
     del efficient_push_pull[:]
     del inefficient_exodus[:]
     del inefficient_push[:]
+    del efficient_push[:]
+    del inefficient_push_pull[:]
 
     
 class Encounters:
@@ -347,7 +351,7 @@ class Simulation:
         self.p_dtn = P_DTN
         self.num_communities = NUM_COMMUNITIES
         self.num_nodes, self.E_base = self.build_graph(edge_file)
-        self.E_base = [[2, 4], [2, 3], [0, 1], [3, 4], [0, 1], [0, 1], [5, 7], [5, 7], [5, 6], [7, 9], [6, 8], [9, 4], [6, 0], [8, 0], [6, 0], [9, 1], [5, 1], [5, 0]]
+        #self.E_base = [[2, 4], [2, 3], [0, 1], [3, 4], [0, 1], [0, 1], [5, 7], [5, 7], [5, 6], [7, 9], [6, 8], [9, 4], [6, 0], [8, 0], [6, 0], [9, 1], [5, 1], [5, 0]]
         self.draw_base_graph()
         self.E_dtn = []
         self.T = T
@@ -382,7 +386,7 @@ class Simulation:
     def simulate(self):
         print 'starting simulation'
         if self.exodus:
-            self.nodes_exodus[0].reached[0][0] = False
+            self.nodes_exodus[0].reached[0][0] = True
         if self.push:
             self.nodes_push[0].packets[0] = True
         if self.push_pull:
@@ -437,8 +441,8 @@ class Simulation:
             fig1 = plt.figure()
             print len(active_nodes) , t_exodus
 
-            plt.plot( range(0 , len(active_nodes)) , [float(active)/self.num_nodes for active in active_nodes]  , 'b-' , label = "active nodes")
-            plt.plot(   range(0 , len(num_seeds_total)) , [float(seeds)/self.num_nodes for seeds in num_seeds_total],  'r-' ,  label = "num_seeds_total" )
+            plt.plot( range(0 , len(active_nodes)) , [float(active)/self.num_nodes for active in active_nodes]  , 'b-' , label = "switched off nodes")
+            plt.plot(   range(0 , len(num_seeds_total)) , [float(seeds)/self.num_nodes for seeds in num_seeds_total],  'r-' ,  label = "num_seeds" )
             plt.title('Nodes vs Time')
             plt.legend()
 
@@ -447,10 +451,10 @@ class Simulation:
             #plt.plot(   range(0 , len(efficient_push)) , [ efficient_push[i] / (float(inefficient_push[i] + efficient_push[i]) if float(inefficient_push[i] + efficient_push[i]) else 1 )for i in xrange( len(efficient_push))],  'yo' ,  label = "Push efficient" )
             plt.plot(   range(0 , len(efficient_exodus)) ,  efficient_exodus,  'g-' ,  label = "Exodus efficient" )
             plt.plot(   range(0 , len(inefficient_exodus)) ,  inefficient_exodus,  'r-' ,  label = "Exodus inefficient" )
-
+            plt.legend()
             fig2 = plt.figure()
-            plt.plot(   range(0 , len(efficient_push_pull)) ,  efficient_push_pull,  'g-' ,  label = "Push-Pull efficient" )
-            plt.plot(   range(0 , len(inefficient_push_pull)) ,  inefficient_push_pull,  'r-' ,  label = "Push-Pull inefficient" )
+            plt.plot(   range(0 , len(efficient_push)) ,  efficient_push,  'g-' ,  label = "Push efficient" )
+            plt.plot(   range(0 , len(inefficient_push)) ,  inefficient_push,  'r-' ,  label = "Push inefficient" )
 
 
             plt.title('Efficiency vs Time')
@@ -672,11 +676,15 @@ class Simulation:
     
 if __name__ == "__main__":
 
-    modes = ["exodus", "push-pull"]
+    modes = ["exodus", "push"]
     
     # use downloaded dataset
-    #simulator = Simulation( modes, 2000, 1, "facebook_combined.txt", plot = True)
-    simulator = Simulation(modes , T )
+    simulator = Simulation( modes, 10000, 1, "facebook_combined.txt", plot = True)
+    simulator.simulate()
+
+
+    exit()
+    simulator = Simulation(modes , T , plot = True)
     simulator.simulate()
     print simulator.E_base
 
