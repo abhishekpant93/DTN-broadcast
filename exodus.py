@@ -26,10 +26,10 @@ else:
     ITERS = 1
     
 NUM_COMMUNITIES = 5
-P_INTRA_COMMUNITY = 0.55
-P_INTER_COMMUNITY = 0.10
+P_INTRA_COMMUNITY = 0.75
+P_INTER_COMMUNITY = 0.30
 
-T = 1000
+T = 2000
 
 active_nodes = []
 num_seeds_total = []
@@ -373,7 +373,7 @@ class Simulation:
     def simulate(self):
         print 'starting simulation'
         if self.exodus:
-            self.nodes_exodus[0].reached[0][0] = True
+            self.nodes_exodus[0].reached[0][0] = False
         if self.push:
             self.nodes_push[0].packets[0] = True
         if self.push_pull:
@@ -664,6 +664,13 @@ if __name__ == "__main__":
     #simulator = Simulation( modes, 2000, 1, "facebook_combined.txt", plot = True)
     simulator = Simulation(modes , T , plot = True)
     simulator.simulate()
+    print simulator.E_base
+    for node in simulator.nodes_exodus:
+        print 'node ', node.id
+        for i in xrange(simulator.num_nodes):
+            if node.burden[i] > node.B_INIT:
+                print i
+    
     exit()
     
     # use synthetic dataset
