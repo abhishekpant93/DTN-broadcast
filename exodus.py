@@ -25,7 +25,7 @@ if len(sys.argv)  >2:
 else:
     ITERS = 1
     
-NUM_COMMUNITIES =2
+NUM_COMMUNITIES = 2
 P_INTRA_COMMUNITY = 0.75
 P_INTER_COMMUNITY = 0.30
 
@@ -207,7 +207,7 @@ class Node:
         s+= 'switched_off : ' + str(self.switched_off) + '\n'
         s+= 'burden : ' + str(self.burden) + '\n'
         #s+= 'nodeset : ' + str(self.nodeset) + '\n'
-        #s+= 'encounters_tbl ' + str(self.encounters_tbl) + '\n'
+        s+= 'encounters_tbl ' + str(self.encounters_tbl[self.id]) + '\n'
         return s
 
     def __repr__(self):
@@ -217,7 +217,7 @@ class Node:
         s+= 'switched_off : ' + str(self.switched_off) + '\n'
         s+= 'burden : ' + str(self.burden) + '\n'
         #s+= 'nodeset : ' + str(self.nodeset) + '\n'
-        #s+= 'encounters_tbl ' + str(self.encounters_tbl) + '\n'
+        s+= 'encounters_tbl ' + str(self.encounters_tbl[self.id]) + '\n'
         return s
 
 def get_total_burdens(nodes):
@@ -347,8 +347,8 @@ class Simulation:
         self.p_dtn = P_DTN
         self.num_communities = NUM_COMMUNITIES
         self.num_nodes, self.E_base = self.build_graph(edge_file)
+        self.E_base = [[2, 4], [2, 3], [0, 1], [3, 4], [0, 1], [0, 1], [5, 7], [5, 7], [5, 6], [7, 9], [6, 8], [9, 4], [6, 0], [8, 0], [6, 0], [9, 1], [5, 1], [5, 0]]
         self.draw_base_graph()
-        #print self.E_base
         self.E_dtn = []
         self.T = T
         self.exodus = self.push = self.push_pull = False
@@ -591,13 +591,13 @@ class Simulation:
         inefficient_exodus.append(0)
         for edge in self.E_dtn:
             self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]] = Connection.connect_exodus(self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]])
-        b = get_total_burdens(self.nodes_exodus)
-        print 'burdens :', b, 'total : ', sum(b)
-        if not all( [ abs(b[i] - self.burdens[i]) < 10**-10 for i in xrange(self.num_nodes)]) and len(efficient_exodus)>1:
-            print b
-            print self.burdens
-            print "Burden sums are not the same"
-            exit()
+        #b = get_total_burdens(self.nodes_exodus)
+        #print 'burdens :', b, 'total : ', sum(b)
+        # if not all( [ abs(b[i] - self.burdens[i]) < 10**-10 for i in xrange(self.num_nodes)]) and len(efficient_exodus)>1:
+        #     print b
+        #     print self.burdens
+        #     print "Burden sums are not the same"
+        #     exit()
 
         
     def build_graph(self, edge_file = None):
@@ -679,16 +679,20 @@ if __name__ == "__main__":
     simulator = Simulation(modes , T )
     simulator.simulate()
     print simulator.E_base
-    for node in simulator.nodes_exodus:
-        print 'node ', node.id
-        for i in xrange(simulator.num_nodes):
-            if node.burden[i] > node.B_INIT:
-                print i
 
+    for node in simulator.nodes_exodus:
+        print node
+            
     for i in xrange(simulator.num_nodes):
-        burden_i = [(node.burden[i], node.id) for node in simulator.nodes_exodus]
-        max_for_i = max(burden_i)
-        print 'Node ', max_for_i[1], ' has max burden for ', i
+        max_b_i = (-1.0, -1.0)
+        for j in xrange(simulator.num_nodes):
+            if simulator.nodes_exodus[j].burden[i] > max_b_i[0]:
+                max_b_i = (simulator.nodes_exodus[j].burden[i], j)
+        print 'Node ', max_b_i[1], ' has max burden for ', i
+
+        # burden_i = [(node.burden[i], node.id) for node in simulator.nodes_exodus]
+        # max_for_i = max(burden_i)
+        # print 'Node ', max_for_i[1], ' has max burden for ', i
 
     print get_total_burdens(simulator.nodes_exodus)
     print sum(get_total_burdens(simulator.nodes_exodus))
