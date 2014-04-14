@@ -25,7 +25,7 @@ if len(sys.argv)  >2:
 else:
     ITERS = 1
     
-NUM_COMMUNITIES = 5
+NUM_COMMUNITIES =2
 P_INTRA_COMMUNITY = 0.75
 P_INTER_COMMUNITY = 0.30
 
@@ -165,14 +165,14 @@ class Node:
         else:
             # each other's burdens
             # neither has packet and they have not met before
-            if nodei.encounters_tbl[nodei.id].freq_tbl[nodej.id] == 1:
+            # if nodei.encounters_tbl[nodei.id].freq_tbl[nodej.id] == 1:
                 
-                nodej.burden[nodei.id] += nodej.B_RESERVED
-                nodej.burden[nodej.id] -= nodej.B_RESERVED
+            #     nodej.burden[nodei.id] += nodej.B_RESERVED
+            #     nodej.burden[nodej.id] -= nodej.B_RESERVED
 
-                nodei.burden[nodej.id] += nodei.B_RESERVED
-                nodei.burden[nodei.id] -= nodei.B_RESERVED
-
+            #     nodei.burden[nodej.id] += nodei.B_RESERVED
+            #     nodei.burden[nodei.id] -= nodei.B_RESERVED
+            pass
         for k in nodei.nodeset:
             if k!=nodei.id and k!=nodej.id and nodei.burden[k]!=0:
                 temp = nodei.burden[k]
@@ -198,7 +198,7 @@ class Node:
                     nodei.burden[k] = 0.5 * ( nodei.burden[k] + nodej.burden[k] )
                     nodej.burden[k] = 0.5 * ( nodei_old_burden + nodej.burden[k] )
                     
-                    #print 'burden update : nodej id ', nodei.id, 'for k = ', k, ' new = ', nodei.burden[k], ' old = ', temp,' case = ', case
+                #print 'burden update : node id ', nodei.id, 'for k = ', k, ' new = ', nodei.burden[k], ' old = ', temp,' case = ', case
         
     def __str__(self):
         s = ""
@@ -221,7 +221,14 @@ class Node:
         return s
 
 def get_total_burdens(nodes):
-    return [sum([node.burden[i] for i in xrange(len(nodes))]) for node in nodes]
+    burdens = []
+    for i in xrange(len(nodes)):
+        sum_i = 0.0
+        for j in xrange(len(nodes)):
+            sum_i += nodes[j].burden[i]
+        burdens.append(sum_i)
+    return burdens
+#return [sum([node.burden[i] for i in xrange(len(nodes))]) for node in nodes]
 
 class Connection:
     @staticmethod
@@ -347,10 +354,12 @@ class Simulation:
         self.exodus = self.push = self.push_pull = False
         self.modes = list(set([mode.lower() for mode in modes]))
         self.plot = plot
+        
         B_THRESH = 1.0 / self.num_nodes
         B_INIT = 1.0 / self.num_nodes
         B_RESERVED = 1.0 / self.num_nodes ** 2
-
+        self.burdens = [ self.num_nodes * B_INIT for j in xrange(self.num_nodes)]
+        
         if "exodus" in self.modes:
             start = time.time()
             print 'making nodes for exodus'
@@ -582,9 +591,14 @@ class Simulation:
         inefficient_exodus.append(0)
         for edge in self.E_dtn:
             self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]] = Connection.connect_exodus(self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]])
-        burdens = get_total_burdens(self.nodes_exodus)
-        #print 'burdens :', burdens, 'total : ', sum(burdens)
-        return False
+        b = get_total_burdens(self.nodes_exodus)
+        print 'burdens :', b, 'total : ', sum(b)
+        if not all( [ abs(b[i] - self.burdens[i]) < 10**-10 for i in xrange(self.num_nodes)]) and len(efficient_exodus)>1:
+            print b
+            print self.burdens
+            print "Burden sums are not the same"
+            exit()
+
         
     def build_graph(self, edge_file = None):
         E = []
@@ -662,7 +676,7 @@ if __name__ == "__main__":
     
     # use downloaded dataset
     #simulator = Simulation( modes, 2000, 1, "facebook_combined.txt", plot = True)
-    simulator = Simulation(modes , T , plot = True)
+    simulator = Simulation(modes , T )
     simulator.simulate()
     print simulator.E_base
     for node in simulator.nodes_exodus:
@@ -670,7 +684,15 @@ if __name__ == "__main__":
         for i in xrange(simulator.num_nodes):
             if node.burden[i] > node.B_INIT:
                 print i
-    
+
+    for i in xrange(simulator.num_nodes):
+        burden_i = [(node.burden[i], node.id) for node in simulator.nodes_exodus]
+        max_for_i = max(burden_i)
+        print 'Node ', max_for_i[1], ' has max burden for ', i
+
+    print get_total_burdens(simulator.nodes_exodus)
+    print sum(get_total_burdens(simulator.nodes_exodus))
+
     exit()
     
     # use synthetic dataset
