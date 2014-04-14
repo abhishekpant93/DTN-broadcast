@@ -6,7 +6,6 @@ from datetime import datetime
 import time
 import networkx as nx
 
-
 DEBUG = False
 # SIMULATION PARAMETERS
 P_DTN = 0.01
@@ -21,15 +20,15 @@ else:
     NUM_NODES = 1000
 
 if len(sys.argv)  >2:
-    ITERS = int(sys.argv[2])
+    ETA = float(sys.argv[2])
 else:
-    ITERS = 1
+    ETA = 0.1
     
 NUM_COMMUNITIES = 2
-P_INTRA_COMMUNITY = 0.75
-P_INTER_COMMUNITY = 0.30
+P_INTRA_COMMUNITY = 0.15
+P_INTER_COMMUNITY = 0.05
 
-T = 2000
+T = 350
 
 active_nodes = []
 num_seeds_total = []
@@ -322,7 +321,7 @@ class Connection:
                     node_j.burden[k] = 0
             node_j.inefficient_transmissions+= 1
             inefficient += 1        
-            node_j.reached[node_j.id][0] = True
+            #node_j.reached[node_j.id][0] = True
             if DEBUG:
                 print 'exodus - inefficient transmission  (switched off): ', node_i.id, node_j.id
             node_j.attempt_terminate()
@@ -333,7 +332,7 @@ class Connection:
                 if node_j.burden[k] == 0:
                     node_i.burden[k] = 0
             node_i.inefficient_transmissions+= 1
-            node_i.reached[node_i.id][0] = True
+            #node_i.reached[node_i.id][0] = True
             inefficient += 1
             if DEBUG:
                 print 'exodus - inefficient transmission (switched off): ', node_i.id, node_j.id
@@ -443,24 +442,31 @@ class Simulation:
 
             plt.plot( range(0 , len(active_nodes)) , [float(active)/self.num_nodes for active in active_nodes]  , 'b-' , label = "switched off nodes")
             plt.plot(   range(0 , len(num_seeds_total)) , [float(seeds)/self.num_nodes for seeds in num_seeds_total],  'r-' ,  label = "num_seeds" )
-            plt.title('Nodes vs Time')
+            plt.title('Node Status vs Time')
             plt.legend()
 
             fig1 = plt.figure()
-            #plt.plot(   range(0 , len(efficient_exodus)) , [ efficient_exodus[i] / ( float(inefficient_exodus[i] + efficient_exodus[i]) if float(inefficient_exodus[i] + efficient_exodus[i]) else 1 )for i in xrange( len(efficient_exodus))],  'go' ,  label = "Exodus efficient" )
-            #plt.plot(   range(0 , len(efficient_push)) , [ efficient_push[i] / (float(inefficient_push[i] + efficient_push[i]) if float(inefficient_push[i] + efficient_push[i]) else 1 )for i in xrange( len(efficient_push))],  'yo' ,  label = "Push efficient" )
+            plt.plot(   range(0 , len(efficient_exodus)) , [ efficient_exodus[i] / ( float(inefficient_exodus[i] + efficient_exodus[i]) if float(inefficient_exodus[i] + efficient_exodus[i]) else 1 )for i in xrange( len(efficient_exodus))],  'g-' ,  label = "Exodus efficiency" )
+            plt.plot(   range(0 , len(efficient_push)) , [ efficient_push[i] / (float(inefficient_push[i] + efficient_push[i]) if float(inefficient_push[i] + efficient_push[i]) else 1 )for i in xrange( len(efficient_push))],  'y-' ,  label = "Push efficiency" )
+            plt.legend()
+            plt.title('Efficiency vs Time')
+            
+            fig2 = plt.figure()
             plt.plot(   range(0 , len(efficient_exodus)) ,  efficient_exodus,  'g-' ,  label = "Exodus efficient" )
             plt.plot(   range(0 , len(inefficient_exodus)) ,  inefficient_exodus,  'r-' ,  label = "Exodus inefficient" )
             plt.legend()
-            fig2 = plt.figure()
+            plt.title('Efficient vs Time - Exodus')
+            
+            fig3 = plt.figure()
             plt.plot(   range(0 , len(efficient_push)) ,  efficient_push,  'g-' ,  label = "Push efficient" )
             plt.plot(   range(0 , len(inefficient_push)) ,  inefficient_push,  'r-' ,  label = "Push inefficient" )
-
-
-            plt.title('Efficiency vs Time')
+            plt.title('Efficient vs Time - Push')
             plt.legend()
-            plt.show()            
-        return { "exodus_time" : t_exodus}
+            
+            plt.show()
+        eff_exodus = sum([node.efficient_transmissions for node in self.nodes_exodus])
+        ineff_exodus = sum([node.inefficient_transmissions for node in self.nodes_exodus])
+        return { "exodus_time" : t_exodus, 'exodus-efficiency' : 100.0 * float(eff) / ((eff if eff else 1) + ineff) }
                     
                     
             
@@ -475,7 +481,7 @@ class Simulation:
             ineff = sum([node.inefficient_transmissions for node in self.nodes_push])
             print 'Efficient Transmissions :', eff
             print 'Inefficient Transmissions :', ineff
-            print 'Success Transmission % :', 100.0 * float(eff) / (eff + ineff)
+            print 'Success Transmission % :', 100.0 * float(eff) / ( (eff if eff else 1) + ineff)
             print 'Coverage : ', 100.0 * len([node for node in self.nodes_push if node.packets[0]]) / self.num_nodes
             print '----------------------------------------'
         if self.push_pull:
@@ -485,7 +491,7 @@ class Simulation:
             ineff = sum([node.inefficient_transmissions for node in self.nodes_push_pull])
             print 'Efficient Transmissions :', eff
             print 'Inefficient Transmissions :', ineff
-            print 'Success Transmission % :', 100.0 * float(eff) / (eff + ineff)
+            print 'Success Transmission % :', 100.0 * float(eff) / ((eff if eff else 1) + ineff)
             print 'Coverage : ', 100.0 * len([node for node in self.nodes_push_pull if node.packets[0]]) / self.num_nodes
             print '----------------------------------------'
         if self.exodus:
@@ -495,7 +501,7 @@ class Simulation:
             ineff = sum([node.inefficient_transmissions for node in self.nodes_exodus])
             print 'Efficient Transmissions :', eff
             print 'Inefficient Transmissions :', ineff
-            print 'Success Transmission % :', 100.0 * float(eff) / (eff + ineff)
+            print 'Success Transmission % :', 100.0 * float(eff) / ((eff if eff else 1) + ineff)
             print 'Coverage : ', 100.0 * len([node for node in self.nodes_exodus if node.reached[node.id][0]]) / self.num_nodes
             print '----------------------------------------'  
         print''
@@ -634,7 +640,8 @@ class Simulation:
                             E.append([idx1, idx2])
 	                    
         else :
-            E = [[int(x) for x in line.strip().split()] for line in open(edge_file)]
+            E_tmp = [[int(x) for x in line.strip().split()] for line in open(edge_file)]
+            E = [e for e in E_tmp if len(e) == 2]
             nodes = []
             for e in E:
                 nodes.append(e[0])
@@ -677,33 +684,35 @@ class Simulation:
 if __name__ == "__main__":
 
     modes = ["exodus", "push"]
-    
-    # use downloaded dataset
-    simulator = Simulation( modes, 10000, 1, "facebook_combined.txt", plot = True)
-    simulator.simulate()
-
-
+    results = {}
+    for i in xrange(1, 99, 2):
+        ETA = i / 100.0
+        print 'ETA = ', ETA
+        simulator = Simulation( modes, T, 1, "edges.out", plot = False)
+        ret_dict = simulator.simulate()
+        results[ETA] = ret_dict['exodus-efficiency']
+    print results
     exit()
+    
     simulator = Simulation(modes , T , plot = True)
     simulator.simulate()
-    print simulator.E_base
-
-    for node in simulator.nodes_exodus:
-        print node
+    # f = open("edges.out", 'w')
+    # for e in simulator.E_base:
+    #     line = str(e[0]) + " " + str(e[1]) + "\n"
+    #     f.write(line)
+    # f.close()
+    #for node in simulator.nodes_exodus:
+    #    print node
             
-    for i in xrange(simulator.num_nodes):
-        max_b_i = (-1.0, -1.0)
-        for j in xrange(simulator.num_nodes):
-            if simulator.nodes_exodus[j].burden[i] > max_b_i[0]:
-                max_b_i = (simulator.nodes_exodus[j].burden[i], j)
-        print 'Node ', max_b_i[1], ' has max burden for ', i
+    # for i in xrange(simulator.num_nodes):
+    #     max_b_i = (-1.0, -1.0)
+    #     for j in xrange(simulator.num_nodes):
+    #         if simulator.nodes_exodus[j].burden[i] > max_b_i[0]:
+    #             max_b_i = (simulator.nodes_exodus[j].burden[i], j)
+    #     print 'Node ', max_b_i[1], ' has max burden for ', i
 
-        # burden_i = [(node.burden[i], node.id) for node in simulator.nodes_exodus]
-        # max_for_i = max(burden_i)
-        # print 'Node ', max_for_i[1], ' has max burden for ', i
-
-    print get_total_burdens(simulator.nodes_exodus)
-    print sum(get_total_burdens(simulator.nodes_exodus))
+    #print get_total_burdens(simulator.nodes_exodus)
+    #print sum(get_total_burdens(simulator.nodes_exodus))
 
     exit()
     
