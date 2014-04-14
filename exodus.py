@@ -4,6 +4,7 @@ import copy
 import time
 from datetime import datetime
 import time
+import networkx as nx
 
 
 DEBUG = False
@@ -25,8 +26,8 @@ else:
     ITERS = 1
     
 NUM_COMMUNITIES = 5
-P_INTRA_COMMUNITY = 0.85
-P_INTER_COMMUNITY = 0.35
+P_INTRA_COMMUNITY = 0.55
+P_INTER_COMMUNITY = 0.10
 
 T = 1000
 
@@ -339,6 +340,7 @@ class Simulation:
         self.p_dtn = P_DTN
         self.num_communities = NUM_COMMUNITIES
         self.num_nodes, self.E_base = self.build_graph(edge_file)
+        self.draw_base_graph()
         #print self.E_base
         self.E_dtn = []
         self.T = T
@@ -625,6 +627,16 @@ class Simulation:
         print 'num_nodes :', num_nodes    
         return num_nodes, E
 
+    def draw_base_graph(self):
+        print 'drawing base graph ...'
+        G = nx.Graph()
+        G.add_nodes_from(xrange(self.num_nodes))
+        G.add_edges_from(self.E_base)
+        #nx.draw_spring(G)
+        nx.write_graphml(G,'exodus.graphml')
+        print 'done ...'
+
+        
     def get_dtn_edges(self):
         E_dtn_temp = []
         E_dtn = []
