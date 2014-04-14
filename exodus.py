@@ -466,7 +466,7 @@ class Simulation:
             plt.show()
         eff_exodus = sum([node.efficient_transmissions for node in self.nodes_exodus])
         ineff_exodus = sum([node.inefficient_transmissions for node in self.nodes_exodus])
-        return { "exodus_time" : t_exodus, 'exodus-efficiency' : 100.0 * float(eff) / ((eff if eff else 1) + ineff) }
+        return { "exodus_time" : t_exodus, 'exodus-efficiency' : 100.0 * float(eff_exodus) / ((eff_exodus if eff_exodus else 1) + ineff_exodus) }
                     
                     
             
