@@ -1,35 +1,15 @@
 import matplotlib.pyplot as plt
 import random
-import copy
 import time
 from datetime import datetime
 import time
 import networkx as nx
+import sys
+import getopt
 
 DEBUG = False
-# SIMULATION PARAMETERS
-P_DTN = 0.01
-ETA = 0.1
 
-# SYNTHETIC DATASET
-import sys
-if len(sys.argv) > 1:
-    NUM_NODES = int(sys.argv[1])
-
-else:
-    NUM_NODES = 1000
-
-if len(sys.argv)  >2:
-    ETA = float(sys.argv[2])
-else:
-    ETA = 0.1
-    
-NUM_COMMUNITIES = 2
-P_INTRA_COMMUNITY = 0.15
-P_INTER_COMMUNITY = 0.05
-
-T = 350
-
+# LISTS TO HOLD SIMULATION RESULTS
 active_nodes = []
 num_seeds_total = []
 efficient_exodus = []
@@ -38,17 +18,6 @@ efficient_push_pull = []
 inefficient_exodus = []
 inefficient_push = []
 inefficient_push_pull = []
-
-def reset_shit():
-    del active_nodes[:]
-    del num_seeds_total[:]
-    del efficient_exodus[:]
-    del efficient_push_pull[:]
-    del inefficient_exodus[:]
-    del inefficient_push[:]
-    del efficient_push[:]
-    del inefficient_push_pull[:]
-
     
 class Encounters:
     
@@ -87,13 +56,14 @@ class Encounters:
         
 class Node:
 
-    def __init__(self, node_id, num_nodes, B_INIT, B_THRESH, B_RESERVED, num_pkts = 1):
+    def __init__(self, node_id, num_nodes, B_INIT, B_THRESH, B_RESERVED, ETA, num_pkts = 1):
         self.id = node_id
         self.switched_off = False
         self.encounters_tbl = {self.id : Encounters(self.id)}
         self.B_INIT = B_INIT
         self.B_THRESH = B_THRESH
         self.B_RESERVED = B_RESERVED
+        self.ETA = ETA
         self.burden = [B_INIT for i in xrange(0,num_nodes)]
         self.nodeset = [self.id]
         self.reached = [[False for i in xrange(0,num_pkts)] for j in xrange(0,num_nodes)]
@@ -104,7 +74,7 @@ class Node:
         
     @staticmethod    
     def copy(node):
-        n = Node(node.id, node.num_nodes, node.B_INIT, node.B_THRESH, node.B_RESERVED, len(node.packets))
+        n = Node(node.id, node.num_nodes, node.B_INIT, node.B_THRESH, node.B_RESERVED, node.ETA, len(node.packets))
         n.switched_off = node.switched_off
         n.encounters_tbl = node.encounters_tbl
         n.burden = node.burden
@@ -123,7 +93,7 @@ class Node:
         for i in xrange(0, self.num_nodes):
             if self.burden[i] >= self.B_THRESH and i != self.id:
                 cnt+=1
-        if cnt <= self.num_nodes * ETA:
+        if cnt <= self.num_nodes * self.ETA:
             if DEBUG:
                 print 'node', self.id, ' switching off'
             self.switched_off = True
@@ -147,7 +117,6 @@ class Node:
 
     @staticmethod
     def update_burden( nodei , nodej):
-        #print 'updating burden for node %d with node %d' % (self.id, node.id)
         # transitive termination
         for i in xrange(0,nodei.num_nodes):
             if nodej.burden[i] == 0:
@@ -163,19 +132,7 @@ class Node:
             nodei.burden[nodei.id] = 0
             nodej.burden[nodei.id] = 0
             nodej.burden[nodej.id] = 0
-
-        # neither has the packet
-        else:
-            # each other's burdens
-            # neither has packet and they have not met before
-            # if nodei.encounters_tbl[nodei.id].freq_tbl[nodej.id] == 1:
-                
-            #     nodej.burden[nodei.id] += nodej.B_RESERVED
-            #     nodej.burden[nodej.id] -= nodej.B_RESERVED
-
-            #     nodei.burden[nodej.id] += nodei.B_RESERVED
-            #     nodei.burden[nodei.id] -= nodei.B_RESERVED
-            pass
+            
         for k in nodei.nodeset:
             if k!=nodei.id and k!=nodej.id and nodei.burden[k]!=0:
                 temp = nodei.burden[k]
@@ -201,7 +158,8 @@ class Node:
                     nodei.burden[k] = 0.5 * ( nodei.burden[k] + nodej.burden[k] )
                     nodej.burden[k] = 0.5 * ( nodei_old_burden + nodej.burden[k] )
                     
-                #print 'burden update : node id ', nodei.id, 'for k = ', k, ' new = ', nodei.burden[k], ' old = ', temp,' case = ', case
+                if DEBUG:
+                    print 'burden update : node id ', nodei.id, 'for k = ', k, ' new = ', nodei.burden[k], ' old = ', temp,' case = ', case
         
     def __str__(self):
         s = ""
@@ -209,8 +167,9 @@ class Node:
         s+= 'node_id : %d\n' % self.id
         s+= 'switched_off : ' + str(self.switched_off) + '\n'
         s+= 'burden : ' + str(self.burden) + '\n'
-        #s+= 'nodeset : ' + str(self.nodeset) + '\n'
-        s+= 'encounters_tbl ' + str(self.encounters_tbl[self.id]) + '\n'
+        if DEBUG:
+            s+= 'nodeset : ' + str(self.nodeset) + '\n'
+            s+= 'encounters_tbl ' + str(self.encounters_tbl[self.id]) + '\n'
         return s
 
     def __repr__(self):
@@ -219,25 +178,19 @@ class Node:
         s+= 'node_id : %d\n' % self.id
         s+= 'switched_off : ' + str(self.switched_off) + '\n'
         s+= 'burden : ' + str(self.burden) + '\n'
-        #s+= 'nodeset : ' + str(self.nodeset) + '\n'
-        s+= 'encounters_tbl ' + str(self.encounters_tbl[self.id]) + '\n'
+        if DEBUG:
+            s+= 'nodeset : ' + str(self.nodeset) + '\n'
+            s+= 'encounters_tbl ' + str(self.encounters_tbl[self.id]) + '\n'
         return s
 
-def get_total_burdens(nodes):
-    burdens = []
-    for i in xrange(len(nodes)):
-        sum_i = 0.0
-        for j in xrange(len(nodes)):
-            sum_i += nodes[j].burden[i]
-        burdens.append(sum_i)
-    return burdens
-#return [sum([node.burden[i] for i in xrange(len(nodes))]) for node in nodes]
-
 class Connection:
+            
     @staticmethod
     def connect_exodus(node_i, node_j):
+        
         inefficient = 0
         efficient = 0
+        
         if not (node_i.switched_off or node_j.switched_off):
             
             node_i_copy = Node.copy(node_i)
@@ -248,20 +201,12 @@ class Connection:
             node_j.add_encounter(node_i_copy)
             
             # merge the encounters arrays
-            # start = time.time()
             node_i.union_encounters_tbl(node_j_copy)
             node_j.union_encounters_tbl(node_i_copy)
-            # finish = time.time()
-            # t3 = finish - start
-            # print 'merge encounters time :', t3
             
             # update the nodesets
-            # start = time.time()
             node_i.update_nodeset(node_j_copy)
             node_j.update_nodeset(node_i_copy)
-            # finish = time.time()
-            # t4 = finish - start
-            # print 'update nodeset time :', t4
             
             # transfer packet if possible and update efficiency stats
             if node_i.reached[node_i.id][0] == True and node_j.reached[node_j.id][0] == False:
@@ -293,26 +238,10 @@ class Connection:
                 inefficient += 1    
                 
             # update burdens
-            # start = time.time()
-            #node_i.update_burden(node_j_copy)
-            #node_j.update_burden(node_i_copy)
             Node.update_burden(node_i , node_j)
-            # finish = time.time()
-            # t5 = finish - start
-            # print 'update burdens time :', t5
-            
-            # start = time.time()
+
             node_i.attempt_terminate()
             node_j.attempt_terminate()
-            # finish = time.time()
-            # t6 = finish - start
-            # print 'attempt terminate time :', t6
-
-            # times = [t0, t1, t2, t3, t4, t5, t6]
-            # bottleneck = max(times)
-            # print 'bottleneck :', bottleneck
-            # print 'scaled times :', sorted([t/bottleneck for t in times], reverse = True)
-            # print '~~~~~~~~~~~'
             
         elif node_i.switched_off and not node_j.switched_off:
             # transitive termination
@@ -321,7 +250,6 @@ class Connection:
                     node_j.burden[k] = 0
             node_j.inefficient_transmissions+= 1
             inefficient += 1        
-            #node_j.reached[node_j.id][0] = True
             if DEBUG:
                 print 'exodus - inefficient transmission  (switched off): ', node_i.id, node_j.id
             node_j.attempt_terminate()
@@ -332,58 +260,58 @@ class Connection:
                 if node_j.burden[k] == 0:
                     node_i.burden[k] = 0
             node_i.inefficient_transmissions+= 1
-            #node_i.reached[node_i.id][0] = True
             inefficient += 1
             if DEBUG:
                 print 'exodus - inefficient transmission (switched off): ', node_i.id, node_j.id
             node_i.attempt_terminate()
-        efficient_exodus[-1] +=efficient
-        inefficient_exodus[-1] +=inefficient
+
+        efficient_exodus[-1] += efficient
+        inefficient_exodus[-1] += inefficient
         return node_i, node_j
         
 class Simulation:
 
-    def __init__(self, modes = [],  T = 100, num_pkts = 1, edge_file = None, plot = False):
-        # change
-        self.p_intra_community = P_INTRA_COMMUNITY
-        self.p_inter_community = P_INTER_COMMUNITY
-        self.p_dtn = P_DTN
-        self.num_communities = NUM_COMMUNITIES
-        self.num_nodes, self.E_base = self.build_graph(edge_file)
-        #self.E_base = [[2, 4], [2, 3], [0, 1], [3, 4], [0, 1], [0, 1], [5, 7], [5, 7], [5, 6], [7, 9], [6, 8], [9, 4], [6, 0], [8, 0], [6, 0], [9, 1], [5, 1], [5, 0]]
+    # def __init__(self, modes = [],  T = 100, num_pkts = 1, edge_file = None, plot = False, p = None, num_communities = None):
+    def __init__(self, params):
+        
+        self.params = params
+        self.p_inter_community = self.params['P_INTER_CLUSTER']
+        self.p_intra_community = self.params['P_INTRA_CLUSTER']
+        self.num_communities = self.params['NUM_CLUSTERS']
+        self.p_dtn = self.params['P_DTN']
+        self.num_nodes = self.params['NUM_NODES']
+        self.E_base = self.build_graph(self.params['EDGEFILE'])
         self.draw_base_graph()
         self.E_dtn = []
-        self.T = T
+        self.T = self.params['T']
         self.exodus = self.push = self.push_pull = False
-        self.modes = list(set([mode.lower() for mode in modes]))
-        self.plot = plot
+        self.modes = list(set([mode.lower() for mode in self.params['MODES']]))
+        self.plot = self.params['PLOT']
         
-        B_THRESH = 1.0 / self.num_nodes
-        B_INIT = 1.0 / self.num_nodes
         B_RESERVED = 1.0 / self.num_nodes ** 2
-        self.burdens = [ self.num_nodes * B_INIT for j in xrange(self.num_nodes)]
+        #self.burdens = [ self.num_nodes * self.params['B_INIT'] for j in xrange(self.num_nodes)]
         
         if "exodus" in self.modes:
             start = time.time()
             print 'making nodes for exodus'
             self.exodus = True
-            self.nodes_exodus = [Node(i, self.num_nodes, B_THRESH, B_INIT, B_RESERVED) for i in xrange(0,self.num_nodes)]
+            self.nodes_exodus = [Node(i, self.num_nodes, self.params['B_INIT'], self.params['B_THRESH'],B_RESERVED, self.params['ETA']) for i in xrange(0,self.num_nodes)]
             finish = time.time()
             print 'time to make nodes :', finish - start
             
         if "push" in self.modes:
             print 'making nodes for push'
             self.push = True
-            self.nodes_push = [Node(i, self.num_nodes, B_THRESH, B_INIT, B_RESERVED) for i in xrange(0,self.num_nodes)]
+            self.nodes_push = [Node(i, self.num_nodes, self.params['B_INIT'], self.params['B_THRESH'],B_RESERVED, self.params['ETA']) for i in xrange(0,self.num_nodes)]
 
         if "push-pull" in self.modes:
             print 'making nodes for push-pull'
             self.push_pull = True
-            self.nodes_push_pull = [Node(i, self.num_nodes, B_THRESH, B_INIT, B_RESERVED) for i in xrange(0,self.num_nodes)]
+            self.nodes_push_pull = [Node(i, self.num_nodes, self.params['B_INIT'], self.params['B_THRESH'],B_RESERVED, self.params['ETA']) for i in xrange(0,self.num_nodes)]
                     
 
     def simulate(self):
-        print 'starting simulation'
+        print 'starting simulation ...'
         if self.exodus:
             self.nodes_exodus[0].reached[0][0] = True
         if self.push:
@@ -426,15 +354,15 @@ class Simulation:
             
         self.statistics(t_push, t_push_pull, t_exodus)
 
-        tot = 0
-        for i in xrange(self.num_nodes):
-            b = 0
-            for node in self.nodes_exodus:
-                b += node.burden[i]
-            tot += b
-            #nprint 'total burden for i = ', i, ' is ', b
-            #print 'tot burden in sysem = ', tot, ' | should be ', self.num_nodes
-            
+        if DEBUG:
+            tot = 0
+            for i in xrange(self.num_nodes):
+                b = 0
+                for node in self.nodes_exodus:
+                    b += node.burden[i]
+                    tot += b
+            print 'total burden for i = ', i, ' is ', b  
+            print 'total burden in system = ', tot, ' | should be ', self.num_nodes
             
         if self.plot:            
             fig1 = plt.figure()
@@ -469,7 +397,6 @@ class Simulation:
         return { "exodus_time" : t_exodus, 'exodus-efficiency' : 100.0 * float(eff_exodus) / ((eff_exodus if eff_exodus else 1) + ineff_exodus) }
                     
                     
-            
     def statistics(self, t_push, t_push_pull, t_exodus):
         print '\n\n##### STATISTICS #####'
         print 'num_nodes = ', self.num_nodes
@@ -601,18 +528,10 @@ class Simulation:
         inefficient_exodus.append(0)
         for edge in self.E_dtn:
             self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]] = Connection.connect_exodus(self.nodes_exodus[edge[0]], self.nodes_exodus[edge[1]])
-        #b = get_total_burdens(self.nodes_exodus)
-        #print 'burdens :', b, 'total : ', sum(b)
-        # if not all( [ abs(b[i] - self.burdens[i]) < 10**-10 for i in xrange(self.num_nodes)]) and len(efficient_exodus)>1:
-        #     print b
-        #     print self.burdens
-        #     print "Burden sums are not the same"
-        #     exit()
-
         
     def build_graph(self, edge_file = None):
         E = []
-        num_nodes = NUM_NODES
+        num_nodes = self.num_nodes
         if edge_file is None :    
             # intra community edges
             nodes_per_community = int(num_nodes / self.num_communities)
@@ -642,26 +561,20 @@ class Simulation:
         else :
             E_tmp = [[int(x) for x in line.strip().split()] for line in open(edge_file)]
             E = [e for e in E_tmp if len(e) == 2]
-            nodes = []
-            for e in E:
-                nodes.append(e[0])
-                nodes.append(e[1])
-            num_nodes = len(set(nodes))
                 
         print 'built base graph'
+        
         print 'num_nodes :', num_nodes    
-        return num_nodes, E
+        return E
 
     def draw_base_graph(self):
-        print 'drawing base graph ...'
+        print 'writing base graphml ...'
         G = nx.Graph()
         G.add_nodes_from(xrange(self.num_nodes))
         G.add_edges_from(self.E_base)
-        #nx.draw_spring(G)
         nx.write_graphml(G,'exodus.graphml')
-        print 'done ...'
+        print 'done ... (load in Gephi)'
 
-        
     def get_dtn_edges(self):
         E_dtn_temp = []
         E_dtn = []
@@ -680,57 +593,103 @@ class Simulation:
             print E_dtn
         return E_dtn        
 
-    
-if __name__ == "__main__":
+def reset_data():
+    del active_nodes[:]
+    del num_seeds_total[:]
+    del efficient_exodus[:]
+    del efficient_push_pull[:]
+    del inefficient_exodus[:]
+    del inefficient_push[:]
+    del efficient_push[:]
+    del inefficient_push_pull[:]
 
-    modes = ["exodus", "push"]
-    results = {}
-    for i in xrange(1, 99, 2):
-        ETA = i / 100.0
-        print 'ETA = ', ETA
-        simulator = Simulation( modes, T, 1, "edges.out", plot = False)
-        ret_dict = simulator.simulate()
-        results[ETA] = ret_dict['exodus-efficiency']
-    print results
-    exit()
+def parse_args(argv):
+    try:
+        opts, args = getopt.getopt(argv,"hi:b:k:e:n:t:c:p:q:r:")
+    except getopt.GetoptError:
+        print 'python exodus.py -h'
+        sys.exit(2)
+
+    # Defaults:
+    params = {}
+    params['EDGEFILE'] = None
+    params['NUM_NODES'] = 1000
+    params['T'] = 350
+    params['B_INIT'] = None
+    params['B_THRESH'] = None
+    params['ETA'] = 0.1
+    params['NUM_CLUSTERS'] = 2
+    params['P_INTRA_CLUSTER'] = 0.15
+    params['P_INTER_CLUSTER'] = 0.05
+    params['P_DTN'] = 0.01
     
-    simulator = Simulation(modes , T , plot = True)
-    simulator.simulate()
-    # f = open("edges.out", 'w')
-    # for e in simulator.E_base:
-    #     line = str(e[0]) + " " + str(e[1]) + "\n"
-    #     f.write(line)
-    # f.close()
-    #for node in simulator.nodes_exodus:
-    #    print node
+    for opt, arg in opts:
+        if opt == '-h':
+            print 'Usage : python exodus.py [OPTIONS]\n'
+            print 'Options (default in parentheses) :\n'
+            print '-i <edgefile> (default : synthetic graph)'
+            print '-n <NUM_NODES> (1000)'
+            print '-t <T> (350)'
+            print '-b <B_INIT> (1 / NUM_NODES)'
+            print '-k <B_THRESH> (1 / NUM_NODES)'
+            print '-e <ETA> (0.1)'
+            print '-c <NUM_CLUSTERS> (2)'
+            print '-p <P_INTRA_CLUSTER> (0.15)'
+            print '-q <P_INTER_CLUSTER> (0.05)'
+            print '-r <P_DTN> (0.01)'
+            print ''
+            sys.exit()
+        elif opt in ("-i", "--ifile"):
+            params['EDGEFILE'] = arg
+        elif opt == "-b":
+            params['B_INIT'] = float(arg)
+        elif opt == "-k":
+            params['B_THRESH'] = float(arg)
+        elif opt == "-e":
+            params['ETA'] = float(arg)
+        elif opt == "-n":
+            params['NUM_NODES'] = int(arg)
+        elif opt == "-t":
+            params['T'] = int(arg)
+        elif opt == '-c':
+            params['NUM_CLUSTERS'] = int(arg)
+        elif opt == "-p":
+            params['P_INTRA_CLUSTER'] = float(arg)
+        elif opt == "-q":
+            params['P_INTER_CLUSTER'] = float(arg)
+        elif opt == "-r":
+            params['P_DTN'] = float(arg)
             
-    # for i in xrange(simulator.num_nodes):
-    #     max_b_i = (-1.0, -1.0)
-    #     for j in xrange(simulator.num_nodes):
-    #         if simulator.nodes_exodus[j].burden[i] > max_b_i[0]:
-    #             max_b_i = (simulator.nodes_exodus[j].burden[i], j)
-    #     print 'Node ', max_b_i[1], ' has max burden for ', i
+    if params['EDGEFILE'] is not None:
+        params['NUM_CLUSTERS'] = None
+        params['P_INTRA_CLUSTER'] = None
+        params['P_INTER_CLUSTER'] = None
+        E_tmp = [[int(x) for x in line.strip().split()] for line in open(params['EDGEFILE'])]
+        E = [e for e in E_tmp if len(e) == 2]
+        nodes = []
+        for e in E:
+            nodes.append(e[0])
+            nodes.append(e[1])
+        params['NUM_NODES'] = len(set(nodes))
 
-    #print get_total_burdens(simulator.nodes_exodus)
-    #print sum(get_total_burdens(simulator.nodes_exodus))
+    if params['B_INIT'] is None:
+        params['B_INIT'] = 1.0 / params['NUM_NODES']
+    if params['B_THRESH'] is None:
+        params['B_THRESH'] = 1.0 / params['NUM_NODES']
 
-    exit()
-    
-    # use synthetic dataset
-    cum_switched_off = []
-    for i in xrange(1,12 , 2):
-        NUM_COMMUNITIES = i
-        print "NUM_COMMUNITIES is " , NUM_COMMUNITIES        
-        simulator = Simulation(modes, T )
-        simulator.simulate()
-        cum_switched_off.append(active_nodes)
-        reset_shit()
-            
-    # fig = plt.figure()
-    # for i in xrange(len(cum_switched_off)):
-    #     plt.plot( ,  time_list  , 'bo' )
-    # plt.title("Time taken vs nodes")
-    # plt.show()
-
-
+    params['MODES'] = ["exodus", "push"]
+    params['PLOT'] = True
+    return params
         
+if __name__ == "__main__":
+    
+    params = parse_args(sys.argv[1:])
+    
+    print 'SIMULATION PARAMETERS :\n'
+    for k,v in params.items():
+        if v is not None:
+            print k, " : ", v
+    print '----------------------------------------------\n\n'
+                          
+    simulator = Simulation(params)
+    simulator.simulate()
