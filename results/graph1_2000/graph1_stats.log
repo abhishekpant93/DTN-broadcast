@@ -1,0 +1,18 @@
+##### STATISTICS #####
+num_nodes =  2000
+T =  2000
+PUSH :
+Broadcast complete time : 211
+Efficient Transmissions : 1999
+Inefficient Transmissions : 181446
+Success Transmission % : 1.08969991005
+Coverage :  100.0
+----------------------------------------
+EXODUS :
+Broadcast complete time : 211
+Efficient Transmissions : 1930
+Inefficient Transmissions : 17121
+Success Transmission % : 10.1307018004
+Coverage :  100.0
+----------------------------------------
+
